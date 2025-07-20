@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,66 +6,25 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Users, Scissors, DollarSign, Calendar, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Barber {
-  id: number;
+  id: string;
   name: string;
-  avatar: string;
-  phone: string;
-  email: string;
-  startDate: string;
+  avatar_url: string | null;
+  phone: string | null;
+  email: string | null;
+  start_date: string | null;
   specialties: string[];
-  todayServices: number;
-  todayEarnings: number;
-  totalServices: number;
-  rating: number;
+  services_completed: number;
+  total_earnings: number;
+  status: string;
 }
 
 const BarbersManager = () => {
   const { toast } = useToast();
-  
-  const [barbers, setBarbers] = useState<Barber[]>([
-    {
-      id: 1,
-      name: "Alejandro Ariza",
-      avatar: "",
-      phone: "0412-7851168",
-      email: "",
-      startDate: "23/02/2023",
-      specialties: ["Corte clásico", "Barba", "Fade"],
-      todayServices: 0,
-      todayEarnings: 0,
-      totalServices: 0,
-      rating: 4.8
-    },
-    {
-      id: 2,
-      name: "David Velázquez",
-      avatar: "",
-      phone: "0414-6494083",
-      email: "",
-      startDate: "28/03/2023",
-      specialties: ["Corte moderno", "Cejas", "Degradado"],
-      todayServices: 0,
-      todayEarnings: 0,
-      totalServices: 0,
-      rating: 4.9
-    },
-    {
-      id: 3,
-      name: "Ricardo Vargas",
-      avatar: "",
-      phone: "0414-6100630",
-      email: "",
-      startDate: "",
-      specialties: ["Barba", "Bigote", "Corte tradicional"],
-      todayServices: 0,
-      todayEarnings: 0,
-      totalServices: 0,
-      rating: 4.7
-    }
-  ]);
-
+  const [barbers, setBarbers] = useState<Barber[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isAddingBarber, setIsAddingBarber] = useState(false);
   const [newBarber, setNewBarber] = useState({
     name: "",
@@ -74,47 +33,95 @@ const BarbersManager = () => {
     specialties: "",
   });
 
-  const handleAddBarber = () => {
-    if (!newBarber.name || !newBarber.phone || !newBarber.email) {
+  // Fetch barbers from Supabase
+  useEffect(() => {
+    fetchBarbers();
+  }, []);
+
+  const fetchBarbers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('barbers')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setBarbers(data || []);
+    } catch (error) {
+      console.error('Error fetching barbers:', error);
       toast({
         title: "Error",
-        description: "Por favor completa todos los campos obligatorios",
+        description: "No se pudieron cargar los barberos",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddBarber = async () => {
+    if (!newBarber.name || !newBarber.phone) {
+      toast({
+        title: "Error",
+        description: "Por favor completa los campos obligatorios (nombre y teléfono)",
         variant: "destructive",
       });
       return;
     }
 
-    const barber: Barber = {
-      id: barbers.length + 1,
-      name: newBarber.name,
-      avatar: "",
-      phone: newBarber.phone,
-      email: newBarber.email,
-      startDate: new Date().toISOString().split('T')[0],
-      specialties: newBarber.specialties.split(',').map(s => s.trim()).filter(s => s),
-      todayServices: 0,
-      todayEarnings: 0,
-      totalServices: 0,
-      rating: 5.0
-    };
+    try {
+      const barberData = {
+        name: newBarber.name,
+        phone: newBarber.phone || null,
+        email: newBarber.email || null,
+        specialties: newBarber.specialties.split(',').map(s => s.trim()).filter(s => s),
+        services_completed: 0,
+        total_earnings: 0,
+        status: 'active',
+      };
 
-    setBarbers(prev => [...prev, barber]);
-    setNewBarber({
-      name: "",
-      phone: "",
-      email: "",
-      specialties: "",
-    });
-    setIsAddingBarber(false);
+      const { data, error } = await supabase
+        .from('barbers')
+        .insert([barberData])
+        .select()
+        .single();
 
-    toast({
-      title: "Barbero agregado",
-      description: `${barber.name} ha sido agregado al equipo`,
-    });
+      if (error) throw error;
+
+      setBarbers(prev => [data, ...prev]);
+      setNewBarber({
+        name: "",
+        phone: "",
+        email: "",
+        specialties: "",
+      });
+      setIsAddingBarber(false);
+
+      toast({
+        title: "Barbero agregado",
+        description: `${newBarber.name} ha sido agregado al equipo`,
+      });
+    } catch (error) {
+      console.error('Error adding barber:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo agregar el barbero",
+        variant: "destructive",
+      });
+    }
   };
 
-  const totalTodayServices = barbers.reduce((sum, barber) => sum + barber.todayServices, 0);
-  const totalTodayEarnings = barbers.reduce((sum, barber) => sum + barber.todayEarnings, 0);
+  const totalTodayServices = barbers.reduce((sum, barber) => sum + barber.services_completed, 0);
+  const totalTodayEarnings = barbers.reduce((sum, barber) => sum + barber.total_earnings, 0);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-3xl font-bold">Gestión de Barberos</h2>
+        <div className="text-center py-8">Cargando barberos...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -146,7 +153,7 @@ const BarbersManager = () => {
               <Scissors className="h-8 w-8 text-barbershop-silver" />
               <div>
                 <p className="text-2xl font-bold">{totalTodayServices}</p>
-                <p className="text-sm text-muted-foreground">Servicios Hoy</p>
+                <p className="text-sm text-muted-foreground">Servicios Totales</p>
               </div>
             </div>
           </CardContent>
@@ -158,7 +165,7 @@ const BarbersManager = () => {
               <DollarSign className="h-8 w-8 text-barbershop-silver" />
               <div>
                 <p className="text-2xl font-bold">${totalTodayEarnings}</p>
-                <p className="text-sm text-muted-foreground">Ingresos Hoy</p>
+                <p className="text-sm text-muted-foreground">Ingresos Totales</p>
               </div>
             </div>
           </CardContent>
@@ -174,7 +181,7 @@ const BarbersManager = () => {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Nombre Completo</Label>
+                <Label htmlFor="name">Nombre Completo *</Label>
                 <Input
                   id="name"
                   value={newBarber.name}
@@ -184,7 +191,7 @@ const BarbersManager = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Teléfono</Label>
+                <Label htmlFor="phone">Teléfono *</Label>
                 <Input
                   id="phone"
                   value={newBarber.phone}
@@ -234,17 +241,16 @@ const BarbersManager = () => {
             <CardHeader className="pb-3">
               <div className="flex items-center space-x-4">
                 <Avatar className="w-16 h-16">
-                  <AvatarImage src={barber.avatar} alt={barber.name} />
+                  <AvatarImage src={barber.avatar_url || ""} alt={barber.name} />
                   <AvatarFallback className="bg-barbershop-silver text-primary text-xl">
                     {barber.name.split(' ').map(n => n[0]).join('')}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
                   <h3 className="text-xl font-bold">{barber.name}</h3>
-                  <div className="flex items-center space-x-1">
-                    <span className="text-yellow-500">★</span>
-                    <span className="text-sm font-medium">{barber.rating}</span>
-                  </div>
+                  <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                    {barber.status}
+                  </span>
                 </div>
               </div>
             </CardHeader>
@@ -253,8 +259,8 @@ const BarbersManager = () => {
                 {/* Contact Info */}
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Contacto:</p>
-                  <p className="text-sm">{barber.phone}</p>
-                  <p className="text-sm">{barber.email}</p>
+                  <p className="text-sm">{barber.phone || 'Sin teléfono'}</p>
+                  {barber.email && <p className="text-sm">{barber.email}</p>}
                 </div>
 
                 {/* Specialties */}
@@ -272,26 +278,27 @@ const BarbersManager = () => {
                   </div>
                 </div>
 
-                {/* Today's Performance */}
+                {/* Performance */}
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                   <div className="text-center">
-                    <p className="text-lg font-bold text-blue-600">{barber.todayServices}</p>
-                    <p className="text-xs text-muted-foreground">Servicios Hoy</p>
+                    <p className="text-lg font-bold text-blue-600">{barber.services_completed}</p>
+                    <p className="text-xs text-muted-foreground">Servicios</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-lg font-bold text-green-600">${barber.todayEarnings}</p>
-                    <p className="text-xs text-muted-foreground">Ingresos Hoy</p>
+                    <p className="text-lg font-bold text-green-600">${barber.total_earnings}</p>
+                    <p className="text-xs text-muted-foreground">Ganancias</p>
                   </div>
                 </div>
 
-                {/* Total Stats */}
-                <div className="flex items-center justify-between text-sm text-muted-foreground pt-2 border-t">
-                  <div className="flex items-center space-x-1">
-                    <Calendar className="h-4 w-4" />
-                    <span>Desde {new Date(barber.startDate).toLocaleDateString()}</span>
+                {/* Start Date */}
+                {barber.start_date && (
+                  <div className="flex items-center justify-center text-sm text-muted-foreground pt-2 border-t">
+                    <div className="flex items-center space-x-1">
+                      <Calendar className="h-4 w-4" />
+                      <span>Desde {new Date(barber.start_date).toLocaleDateString()}</span>
+                    </div>
                   </div>
-                  <span>{barber.totalServices} servicios</span>
-                </div>
+                )}
               </div>
             </CardContent>
           </Card>
