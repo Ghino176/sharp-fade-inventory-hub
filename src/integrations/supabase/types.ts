@@ -227,7 +227,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_barber_stats: {
+        Args: { barber_id: string; service_price: number }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
