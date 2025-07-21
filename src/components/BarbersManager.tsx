@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Users, Scissors, DollarSign, Calendar, Plus } from "lucide-react";
+import { Users, Scissors, DollarSign, Calendar, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -106,6 +106,44 @@ const BarbersManager = () => {
       toast({
         title: "Error",
         description: "No se pudo agregar el barbero",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteBarber = async (barberId: string, barberName: string) => {
+    if (!confirm(`¿Estás seguro de que deseas eliminar a ${barberName} y todos sus datos asociados?`)) {
+      return;
+    }
+
+    try {
+      // Delete associated services first
+      const { error: servicesError } = await supabase
+        .from('services')
+        .delete()
+        .eq('barber_id', barberId);
+
+      if (servicesError) throw servicesError;
+
+      // Delete the barber
+      const { error: barberError } = await supabase
+        .from('barbers')
+        .delete()
+        .eq('id', barberId);
+
+      if (barberError) throw barberError;
+
+      setBarbers(prev => prev.filter(barber => barber.id !== barberId));
+
+      toast({
+        title: "Barbero eliminado",
+        description: `${barberName} y todos sus datos han sido eliminados`,
+      });
+    } catch (error) {
+      console.error('Error deleting barber:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el barbero",
         variant: "destructive",
       });
     }
@@ -299,6 +337,19 @@ const BarbersManager = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Delete Button */}
+                <div className="pt-2 border-t">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => handleDeleteBarber(barber.id, barber.name)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Eliminar Barbero
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

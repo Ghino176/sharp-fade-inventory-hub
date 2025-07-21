@@ -15,6 +15,8 @@ const Header = ({ activeSection, onSectionChange }: HeaderProps) => {
     { id: "services", label: "Servicios" },
     { id: "inventory", label: "Inventario" },
     { id: "barbers", label: "Barberos" },
+    { id: "weekly-stats", label: "Estadísticas" },
+    { id: "data-manager", label: "Gestión" },
   ];
 
   return (

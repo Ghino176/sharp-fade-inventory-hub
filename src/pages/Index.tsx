@@ -4,6 +4,8 @@ import Dashboard from "@/components/Dashboard";
 import ServicesManager from "@/components/ServicesManager";
 import InventoryManager from "@/components/InventoryManager";
 import BarbersManager from "@/components/BarbersManager";
+import WeeklyStats from "@/components/WeeklyStats";
+import DataManager from "@/components/DataManager";
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -18,6 +20,10 @@ const Index = () => {
         return <InventoryManager />;
       case "barbers":
         return <BarbersManager />;
+      case "weekly-stats":
+        return <WeeklyStats />;
+      case "data-manager":
+        return <DataManager />;
       default:
         return <Dashboard />;
     }
