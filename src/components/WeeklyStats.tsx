@@ -1,22 +1,34 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarDays, Scissors, Package, TrendingUp, TrendingDown } from "lucide-react";
+import { CalendarDays, Scissors, Package, TrendingUp, TrendingDown, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+interface BarberWeeklyStats {
+  id: string;
+  name: string;
+  services_count: number;
+  total_earnings: number;
+  services: {
+    service_type: string;
+    count: number;
+    total_price: number;
+  }[];
+}
+
+interface InventoryWeeklyStats {
+  id: string;
+  name: string;
+  category: string;
+  total_entries: number;
+  total_exits: number;
+  net_movement: number;
+}
+
 const WeeklyStats = () => {
   const { toast } = useToast();
-  const [weeklyServices, setWeeklyServices] = useState({
-    total: 0,
-    earnings: 0,
-    count: 0
-  });
-  
-  const [weeklyInventory, setWeeklyInventory] = useState({
-    transactions: 0,
-    entries: 0,
-    exits: 0
-  });
+  const [barberWeeklyStats, setBarberWeeklyStats] = useState<BarberWeeklyStats[]>([]);
+  const [inventoryWeeklyStats, setInventoryWeeklyStats] = useState<InventoryWeeklyStats[]>([]);
 
   useEffect(() => {
     fetchWeeklyData();
@@ -29,47 +41,90 @@ const WeeklyStats = () => {
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
       const weekStart = oneWeekAgo.toISOString().split('T')[0];
 
-      // Fetch services from last week
+      // Fetch barbers and their weekly services
+      const { data: barbers, error: barbersError } = await supabase
+        .from('barbers')
+        .select('id, name');
+
+      if (barbersError) throw barbersError;
+
+      // Fetch services from last week with barber info
       const { data: services, error: servicesError } = await supabase
         .from('services')
-        .select('price, service_date')
+        .select('barber_id, service_type, price, service_date')
         .gte('service_date', weekStart);
 
       if (servicesError) throw servicesError;
 
-      const servicesStats = services?.reduce(
-        (acc, service) => ({
-          total: acc.total + (service.price || 0),
-          earnings: acc.earnings + (service.price || 0),
-          count: acc.count + 1
-        }),
-        { total: 0, earnings: 0, count: 0 }
-      ) || { total: 0, earnings: 0, count: 0 };
+      // Process barber stats
+      const barberStats: BarberWeeklyStats[] = barbers?.map(barber => {
+        const barberServices = services?.filter(s => s.barber_id === barber.id) || [];
+        
+        // Group services by type
+        const servicesByType: { [key: string]: { count: number; total_price: number } } = {};
+        barberServices.forEach(service => {
+          if (!servicesByType[service.service_type]) {
+            servicesByType[service.service_type] = { count: 0, total_price: 0 };
+          }
+          servicesByType[service.service_type].count++;
+          servicesByType[service.service_type].total_price += service.price || 0;
+        });
 
-      setWeeklyServices(servicesStats);
+        const servicesList = Object.entries(servicesByType).map(([type, data]) => ({
+          service_type: type,
+          count: data.count,
+          total_price: data.total_price
+        }));
+
+        return {
+          id: barber.id,
+          name: barber.name,
+          services_count: barberServices.length,
+          total_earnings: barberServices.reduce((sum, s) => sum + (s.price || 0), 0),
+          services: servicesList
+        };
+      }) || [];
+
+      setBarberWeeklyStats(barberStats);
+
+      // Fetch inventory items and their weekly transactions
+      const { data: inventoryItems, error: inventoryError } = await supabase
+        .from('inventory_items')
+        .select('id, name, category');
+
+      if (inventoryError) throw inventoryError;
 
       // Fetch inventory transactions from last week
       const { data: transactions, error: transactionsError } = await supabase
         .from('inventory_transactions')
-        .select('transaction_type, quantity, transaction_date')
+        .select('item_id, transaction_type, quantity, transaction_date')
         .gte('transaction_date', weekStart);
 
       if (transactionsError) throw transactionsError;
 
-      const inventoryStats = transactions?.reduce(
-        (acc, transaction) => ({
-          transactions: acc.transactions + 1,
-          entries: transaction.transaction_type === 'entrada' 
-            ? acc.entries + transaction.quantity 
-            : acc.entries,
-          exits: transaction.transaction_type === 'salida' 
-            ? acc.exits + transaction.quantity 
-            : acc.exits
-        }),
-        { transactions: 0, entries: 0, exits: 0 }
-      ) || { transactions: 0, entries: 0, exits: 0 };
+      // Process inventory stats
+      const inventoryStats: InventoryWeeklyStats[] = inventoryItems?.map(item => {
+        const itemTransactions = transactions?.filter(t => t.item_id === item.id) || [];
+        
+        const entries = itemTransactions
+          .filter(t => t.transaction_type === 'entrada')
+          .reduce((sum, t) => sum + t.quantity, 0);
+        
+        const exits = itemTransactions
+          .filter(t => t.transaction_type === 'salida')
+          .reduce((sum, t) => sum + t.quantity, 0);
 
-      setWeeklyInventory(inventoryStats);
+        return {
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          total_entries: entries,
+          total_exits: exits,
+          net_movement: entries - exits
+        };
+      }) || [];
+
+      setInventoryWeeklyStats(inventoryStats);
 
     } catch (error) {
       console.error('Error fetching weekly stats:', error);
@@ -91,76 +146,108 @@ const WeeklyStats = () => {
         </div>
       </div>
 
-      {/* Services Stats */}
+      {/* Barber Weekly Stats */}
       <Card className="border-0 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Scissors className="h-5 w-5" />
-            <span>Servicios - Semana Actual</span>
+            <User className="h-5 w-5" />
+            <span>Estadísticas por Barbero - Últimos 7 días</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center p-4 rounded-lg bg-barbershop-light-gray">
-              <div className="text-3xl font-bold text-blue-600 mb-2">
-                {weeklyServices.count}
+          <div className="space-y-6">
+            {barberWeeklyStats.map((barber) => (
+              <div key={barber.id} className="p-4 border rounded-lg bg-barbershop-light-gray">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold">{barber.name}</h3>
+                  <div className="flex space-x-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-blue-600">{barber.services_count}</p>
+                      <p className="text-sm text-muted-foreground">Servicios</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-green-600">${barber.total_earnings.toFixed(2)}</p>
+                      <p className="text-sm text-muted-foreground">Ingresos</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {barber.services.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-2">Servicios Realizados:</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {barber.services.map((service) => (
+                        <div key={service.service_type} className="p-3 bg-white rounded border">
+                          <p className="font-medium">{service.service_type}</p>
+                          <div className="flex justify-between text-sm text-muted-foreground">
+                            <span>Cantidad: {service.count}</span>
+                            <span>Total: ${service.total_price.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {barber.services.length === 0 && (
+                  <p className="text-muted-foreground">No realizó servicios esta semana</p>
+                )}
               </div>
-              <p className="text-sm text-muted-foreground">Servicios Realizados</p>
-            </div>
+            ))}
             
-            <div className="text-center p-4 rounded-lg bg-barbershop-light-gray">
-              <div className="text-3xl font-bold text-green-600 mb-2">
-                ${weeklyServices.earnings.toFixed(2)}
-              </div>
-              <p className="text-sm text-muted-foreground">Ingresos Totales</p>
-            </div>
-            
-            <div className="text-center p-4 rounded-lg bg-barbershop-light-gray">
-              <div className="text-3xl font-bold text-purple-600 mb-2">
-                ${weeklyServices.count > 0 ? (weeklyServices.earnings / weeklyServices.count).toFixed(2) : '0.00'}
-              </div>
-              <p className="text-sm text-muted-foreground">Promedio por Servicio</p>
-            </div>
+            {barberWeeklyStats.length === 0 && (
+              <p className="text-center text-muted-foreground py-8">No hay barberos registrados</p>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Inventory Stats */}
+      {/* Inventory Weekly Stats */}
       <Card className="border-0 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Package className="h-5 w-5" />
-            <span>Inventario - Semana Actual</span>
+            <span>Movimientos de Inventario - Últimos 7 días</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center p-4 rounded-lg bg-barbershop-light-gray">
-              <div className="text-3xl font-bold text-blue-600 mb-2">
-                {weeklyInventory.transactions}
-              </div>
-              <p className="text-sm text-muted-foreground">Transacciones Totales</p>
-            </div>
-            
-            <div className="text-center p-4 rounded-lg bg-barbershop-light-gray">
-              <div className="flex items-center justify-center space-x-2 mb-2">
-                <TrendingUp className="h-6 w-6 text-green-600" />
-                <div className="text-3xl font-bold text-green-600">
-                  {weeklyInventory.entries}
+          <div className="space-y-4">
+            {inventoryWeeklyStats.filter(item => item.total_entries > 0 || item.total_exits > 0).map((item) => (
+              <div key={item.id} className="p-4 border rounded-lg bg-barbershop-light-gray">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h3 className="font-bold">{item.name}</h3>
+                    <p className="text-sm text-muted-foreground">{item.category}</p>
+                  </div>
+                  <div className="flex space-x-4 text-center">
+                    <div className="flex items-center space-x-1">
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                      <div>
+                        <p className="font-bold text-green-600">{item.total_entries}</p>
+                        <p className="text-xs text-muted-foreground">Entradas</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <TrendingDown className="h-4 w-4 text-red-600" />
+                      <div>
+                        <p className="font-bold text-red-600">{item.total_exits}</p>
+                        <p className="text-xs text-muted-foreground">Salidas</p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className={`font-bold ${item.net_movement >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {item.net_movement >= 0 ? '+' : ''}{item.net_movement}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Neto</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <p className="text-sm text-muted-foreground">Entradas de Productos</p>
-            </div>
+            ))}
             
-            <div className="text-center p-4 rounded-lg bg-barbershop-light-gray">
-              <div className="flex items-center justify-center space-x-2 mb-2">
-                <TrendingDown className="h-6 w-6 text-red-600" />
-                <div className="text-3xl font-bold text-red-600">
-                  {weeklyInventory.exits}
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground">Salidas de Productos</p>
-            </div>
+            {inventoryWeeklyStats.filter(item => item.total_entries > 0 || item.total_exits > 0).length === 0 && (
+              <p className="text-center text-muted-foreground py-8">No hubo movimientos de inventario esta semana</p>
+            )}
           </div>
         </CardContent>
       </Card>
