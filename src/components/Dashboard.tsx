@@ -5,9 +5,36 @@ import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
   const [recentServices, setRecentServices] = useState([]);
+  const [stats, setStats] = useState({
+    todayServices: 0,
+    activeBarbers: 0,
+    inventoryItems: 0,
+    todayEarnings: 0
+  });
 
   useEffect(() => {
-    const fetchRecentServices = async () => {
+    const fetchDashboardData = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Fetch today's services
+      const { data: todayServicesData } = await supabase
+        .from('services')
+        .select('price')
+        .eq('service_date', today);
+      
+      // Fetch active barbers
+      const { data: barbersData } = await supabase
+        .from('barbers')
+        .select('id')
+        .eq('status', 'active');
+      
+      // Fetch inventory items
+      const { data: inventoryData } = await supabase
+        .from('inventory_items')
+        .select('quantity')
+        .eq('category', 'snacks');
+      
+      // Fetch recent services for the list
       const { data: services } = await supabase
         .from('services')
         .select(`
@@ -17,38 +44,52 @@ const Dashboard = () => {
         .order('created_at', { ascending: false })
         .limit(5);
       
+      // Calculate stats
+      const todayServices = todayServicesData?.length || 0;
+      const activeBarbers = barbersData?.length || 0;
+      const inventoryItems = inventoryData?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+      const todayEarnings = todayServicesData?.reduce((sum, service) => sum + (Number(service.price) || 0), 0) || 0;
+      
+      setStats({
+        todayServices,
+        activeBarbers,
+        inventoryItems,
+        todayEarnings
+      });
+      
       if (services) {
         setRecentServices(services);
       }
     };
 
-    fetchRecentServices();
+    fetchDashboardData();
   }, []);
-  const stats = [
+
+  const statsData = [
     {
       title: "Servicios Hoy",
-      value: "24",
+      value: stats.todayServices.toString(),
       icon: Scissors,
       change: "+12%",
       color: "text-green-600"
     },
     {
       title: "Barberos Activos",
-      value: "3",
+      value: stats.activeBarbers.toString(),
       icon: Users,
       change: "100%",
       color: "text-blue-600"
     },
     {
       title: "Inventario Snacks",
-      value: "89",
+      value: stats.inventoryItems.toString(),
       icon: Package,
       change: "-5%",
       color: "text-orange-600"
     },
     {
       title: "Ingresos Hoy",
-      value: "$650",
+      value: `$${stats.todayEarnings.toFixed(2)}`,
       icon: DollarSign,
       change: "+8%",
       color: "text-green-600"
@@ -66,7 +107,7 @@ const Dashboard = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
+        {statsData.map((stat, index) => (
           <Card key={index} className="border-0 shadow-lg bg-gradient-to-br from-card to-barbershop-light-gray">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
