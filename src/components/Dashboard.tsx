@@ -1,7 +1,29 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Scissors, Users, Package, DollarSign } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
+  const [recentServices, setRecentServices] = useState([]);
+
+  useEffect(() => {
+    const fetchRecentServices = async () => {
+      const { data: services } = await supabase
+        .from('services')
+        .select(`
+          *,
+          barbers (name)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      if (services) {
+        setRecentServices(services);
+      }
+    };
+
+    fetchRecentServices();
+  }, []);
   const stats = [
     {
       title: "Servicios Hoy",
@@ -31,12 +53,6 @@ const Dashboard = () => {
       change: "+8%",
       color: "text-green-600"
     }
-  ];
-
-  const recentServices = [
-    { id: 1, client: "Juan Pérez", barber: "Carlos", service: "Corte + Barba", time: "10:30 AM", amount: "$25" },
-    { id: 2, client: "María García", barber: "Luis", service: "Corte", time: "11:15 AM", amount: "$15" },
-    { id: 3, client: "Pedro López", barber: "Antonio", service: "Barba + Cejas", time: "12:00 PM", amount: "$20" },
   ];
 
   return (
@@ -86,19 +102,19 @@ const Dashboard = () => {
                 <div className="flex-1">
                   <div className="flex items-center space-x-4">
                     <div>
-                      <p className="font-semibold">{service.client}</p>
+                      <p className="font-semibold">{service.client_name}</p>
                       <p className="text-sm text-muted-foreground">
-                        Barbero: {service.barber}
+                        Barbero: {service.barbers?.name || 'No asignado'}
                       </p>
                     </div>
                     <div className="text-sm">
-                      <p className="font-medium">{service.service}</p>
-                      <p className="text-muted-foreground">{service.time}</p>
+                      <p className="font-medium">{service.service_type}</p>
+                      <p className="text-muted-foreground">{service.service_time || 'No especificado'}</p>
                     </div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-lg">{service.amount}</p>
+                  <p className="font-bold text-lg">${service.price}</p>
                 </div>
               </div>
             ))}
