@@ -30,7 +30,7 @@ const Header = ({ activeSection, onSectionChange }: HeaderProps) => {
               alt="Barbería Logo" 
               className="h-10 w-10 object-contain"
             />
-            <h1 className="text-2xl font-bold">BarberShop Pro</h1>
+            <h1 className="text-2xl font-bold">Lions Studio</h1>
           </div>
 
           {/* Desktop Navigation */}
