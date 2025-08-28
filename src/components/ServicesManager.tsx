@@ -42,12 +42,12 @@ const ServicesManager = () => {
   });
 
   const serviceTypes = [
-    { name: "Corte", price: 15 },
-    { name: "Barba", price: 12 },
-    { name: "Cejas", price: 8 },
-    { name: "Corte + Barba", price: 25 },
-    { name: "Barba + Cejas", price: 20 },
-    { name: "Servicio Completo", price: 35 },
+    { name: "Corte", price: 6 },
+    { name: "Barba", price: 3 },
+    { name: "Cejas", price: 1 },
+    { name: "Corte + Barba", price: 9 },
+    { name: "Barba + Cejas", price: 4 },
+    { name: "Servicio Completo", price: 10 },
   ];
 
   useEffect(() => {
