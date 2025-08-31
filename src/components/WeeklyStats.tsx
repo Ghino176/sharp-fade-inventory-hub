@@ -16,6 +16,15 @@ interface BarberWeeklyStats {
   }[];
 }
 
+interface JefeWeeklyStats {
+  total_earnings: number;
+  services: {
+    service_type: string;
+    count: number;
+    total_price: number;
+  }[];
+}
+
 interface InventoryWeeklyStats {
   id: string;
   name: string;
@@ -29,10 +38,26 @@ const WeeklyStats = () => {
   const { toast } = useToast();
   const [barberWeeklyStats, setBarberWeeklyStats] = useState<BarberWeeklyStats[]>([]);
   const [inventoryWeeklyStats, setInventoryWeeklyStats] = useState<InventoryWeeklyStats[]>([]);
+  const [jefeWeeklyStats, setJefeWeeklyStats] = useState<JefeWeeklyStats>({ total_earnings: 0, services: [] });
 
   useEffect(() => {
     fetchWeeklyData();
   }, []);
+
+  const getServicePrice = (serviceType: string): number => {
+    const type = serviceType.toLowerCase();
+    if (type.includes('corte')) return 3.5;
+    if (type.includes('barba')) return 1.5;
+    if (type.includes('ceja')) return 1.0;
+    return 0;
+  };
+
+  const getJefeCommission = (serviceType: string): number => {
+    const type = serviceType.toLowerCase();
+    if (type.includes('corte')) return 2.5;
+    if (type.includes('barba')) return 1.5;
+    return 0;
+  };
 
   const fetchWeeklyData = async () => {
     try {
@@ -56,7 +81,7 @@ const WeeklyStats = () => {
 
       if (servicesError) throw servicesError;
 
-      // Process barber stats
+      // Process barber stats with new pricing
       const barberStats: BarberWeeklyStats[] = barbers?.map(barber => {
         const barberServices = services?.filter(s => s.barber_id === barber.id) || [];
         
@@ -67,7 +92,7 @@ const WeeklyStats = () => {
             servicesByType[service.service_type] = { count: 0, total_price: 0 };
           }
           servicesByType[service.service_type].count++;
-          servicesByType[service.service_type].total_price += service.price || 0;
+          servicesByType[service.service_type].total_price += getServicePrice(service.service_type);
         });
 
         const servicesList = Object.entries(servicesByType).map(([type, data]) => ({
@@ -80,12 +105,36 @@ const WeeklyStats = () => {
           id: barber.id,
           name: barber.name,
           services_count: barberServices.length,
-          total_earnings: barberServices.reduce((sum, s) => sum + (s.price || 0), 0),
+          total_earnings: barberServices.reduce((sum, s) => sum + getServicePrice(s.service_type), 0),
           services: servicesList
         };
       }) || [];
 
       setBarberWeeklyStats(barberStats);
+
+      // Process Jefe stats (commission from all services)
+      const allServicesByType: { [key: string]: { count: number; total_price: number } } = {};
+      services?.forEach(service => {
+        if (!allServicesByType[service.service_type]) {
+          allServicesByType[service.service_type] = { count: 0, total_price: 0 };
+        }
+        allServicesByType[service.service_type].count++;
+        allServicesByType[service.service_type].total_price += getJefeCommission(service.service_type);
+      });
+
+      const jefeServicesList = Object.entries(allServicesByType).map(([type, data]) => ({
+        service_type: type,
+        count: data.count,
+        total_price: data.total_price
+      }));
+
+      const jefeTotalEarnings = services?.reduce((sum, s) => sum + getJefeCommission(s.service_type), 0) || 0;
+
+      setJefeWeeklyStats({
+        total_earnings: jefeTotalEarnings,
+        services: jefeServicesList
+      });
+
 
       // Fetch inventory items and their weekly transactions
       const { data: inventoryItems, error: inventoryError } = await supabase
@@ -145,6 +194,48 @@ const WeeklyStats = () => {
           <span>Últimos 7 días</span>
         </div>
       </div>
+
+      {/* Jefe Weekly Stats */}
+      <Card className="border-0 shadow-lg bg-gradient-to-r from-yellow-50 to-orange-50">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Scissors className="h-5 w-5 text-yellow-600" />
+            <span>Comisiones del Jefe - Últimos 7 días</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="p-4 border-2 border-yellow-200 rounded-lg bg-white">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-yellow-800">Total Comisiones</h3>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-yellow-600">${jefeWeeklyStats.total_earnings.toFixed(2)}</p>
+                <p className="text-sm text-muted-foreground">Ingresos por Comisión</p>
+              </div>
+            </div>
+            
+            {jefeWeeklyStats.services.length > 0 && (
+              <div>
+                <h4 className="font-semibold mb-2">Desglose por Servicio:</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {jefeWeeklyStats.services.map((service) => (
+                    <div key={service.service_type} className="p-3 bg-yellow-50 rounded border border-yellow-200">
+                      <p className="font-medium text-yellow-800">{service.service_type}</p>
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Cantidad: {service.count}</span>
+                        <span>Comisión: ${service.total_price.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {jefeWeeklyStats.services.length === 0 && (
+              <p className="text-muted-foreground">No hay servicios esta semana</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Barber Weekly Stats */}
       <Card className="border-0 shadow-lg">
