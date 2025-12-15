@@ -11,7 +11,7 @@ const DataManager = () => {
 
   const handleResetAllData = async () => {
     const confirmReset = confirm(
-      "⚠️ ADVERTENCIA: Esta acción eliminará TODOS los datos de la aplicación (barberos, servicios, inventario y transacciones). Esta acción NO se puede deshacer. ¿Estás seguro de que deseas continuar?"
+      "⚠️ ADVERTENCIA: Esta acción eliminará TODOS los datos de la aplicación (barberos, servicios, inventario). Esta acción NO se puede deshacer. ¿Estás seguro de que deseas continuar?"
     );
 
     if (!confirmReset) return;
@@ -27,35 +27,27 @@ const DataManager = () => {
     try {
       // Delete all data in the correct order (relationships first)
       
-      // 1. Delete all inventory transactions
-      const { error: transactionsError } = await supabase
-        .from('inventory_transactions')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
-
-      if (transactionsError) throw transactionsError;
-
-      // 2. Delete all inventory items
-      const { error: inventoryError } = await supabase
-        .from('inventory_items')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
-
-      if (inventoryError) throw inventoryError;
-
-      // 3. Delete all services
+      // 1. Delete all services (has foreign key to barbers)
       const { error: servicesError } = await supabase
         .from('services')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+        .neq('id', '00000000-0000-0000-0000-000000000000');
 
       if (servicesError) throw servicesError;
 
-      // 4. Delete all barbers
+      // 2. Delete all inventory items
+      const { error: inventoryError } = await supabase
+        .from('inventory')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
+      if (inventoryError) throw inventoryError;
+
+      // 3. Delete all barbers
       const { error: barbersError } = await supabase
         .from('barbers')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+        .neq('id', '00000000-0000-0000-0000-000000000000');
 
       if (barbersError) throw barbersError;
 
@@ -109,7 +101,6 @@ const DataManager = () => {
               <li>• Todos los barberos y su información</li>
               <li>• Todos los servicios realizados</li>
               <li>• Todo el inventario de productos</li>
-              <li>• Todas las transacciones de inventario</li>
               <li>• Todas las estadísticas y métricas</li>
             </ul>
             <p className="text-sm text-red-700 font-semibold mb-4">

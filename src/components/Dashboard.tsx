@@ -3,11 +3,20 @@ import { Scissors, Users, Package, DollarSign } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+interface Service {
+  id: string;
+  barber_id: string;
+  service_type: string;
+  price: number;
+  created_at: string;
+  barbers: { name: string } | null;
+}
+
 const Dashboard = () => {
-  const [recentServices, setRecentServices] = useState([]);
+  const [recentServices, setRecentServices] = useState<Service[]>([]);
   const [stats, setStats] = useState({
     todayServices: 0,
-    activeBarbers: 0,
+    totalBarbers: 0,
     inventoryItems: 0,
     todayEarnings: 0
   });
@@ -16,23 +25,22 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       const today = new Date().toISOString().split('T')[0];
       
-      // Fetch today's services
+      // Fetch today's services (using created_at since service_date doesn't exist)
       const { data: todayServicesData } = await supabase
         .from('services')
-        .select('price')
-        .eq('service_date', today);
+        .select('price, created_at')
+        .gte('created_at', `${today}T00:00:00`)
+        .lte('created_at', `${today}T23:59:59`);
       
-      // Fetch active barbers
+      // Fetch all barbers
       const { data: barbersData } = await supabase
         .from('barbers')
-        .select('id')
-        .eq('status', 'active');
+        .select('id');
       
       // Fetch inventory items
       const { data: inventoryData } = await supabase
-        .from('inventory_items')
-        .select('quantity')
-        .eq('category', 'snacks');
+        .from('inventory')
+        .select('quantity');
       
       // Fetch recent services for the list
       const { data: services } = await supabase
@@ -46,13 +54,13 @@ const Dashboard = () => {
       
       // Calculate stats
       const todayServices = todayServicesData?.length || 0;
-      const activeBarbers = barbersData?.length || 0;
+      const totalBarbers = barbersData?.length || 0;
       const inventoryItems = inventoryData?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
       const todayEarnings = todayServicesData?.reduce((sum, service) => sum + (Number(service.price) || 0), 0) || 0;
       
       setStats({
         todayServices,
-        activeBarbers,
+        totalBarbers,
         inventoryItems,
         todayEarnings
       });
@@ -74,14 +82,14 @@ const Dashboard = () => {
       color: "text-green-600"
     },
     {
-      title: "Barberos Activos",
-      value: stats.activeBarbers.toString(),
+      title: "Barberos",
+      value: stats.totalBarbers.toString(),
       icon: Users,
       change: "100%",
       color: "text-blue-600"
     },
     {
-      title: "Inventario Snacks",
+      title: "Inventario Total",
       value: stats.inventoryItems.toString(),
       icon: Package,
       change: "-5%",
@@ -143,22 +151,29 @@ const Dashboard = () => {
                 <div className="flex-1">
                   <div className="flex items-center space-x-4">
                     <div>
-                      <p className="font-semibold">{service.client_name}</p>
+                      <p className="font-semibold capitalize">{service.service_type}</p>
                       <p className="text-sm text-muted-foreground">
                         Barbero: {service.barbers?.name || 'No asignado'}
                       </p>
                     </div>
                     <div className="text-sm">
-                      <p className="font-medium">{service.service_type}</p>
-                      <p className="text-muted-foreground">{service.service_time || 'No especificado'}</p>
+                      <p className="text-muted-foreground">
+                        {new Date(service.created_at).toLocaleDateString()}
+                      </p>
                     </div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-lg">${service.price}</p>
+                  <p className="font-bold text-lg">${Number(service.price).toFixed(2)}</p>
                 </div>
               </div>
             ))}
+            
+            {recentServices.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No hay servicios registrados
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

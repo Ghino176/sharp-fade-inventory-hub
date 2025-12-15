@@ -4,25 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Scissors, DollarSign, Calendar, Clock, User, Trash2 } from "lucide-react";
+import { Plus, Scissors, DollarSign, Calendar, User, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Barber {
   id: string;
   name: string;
-  status: string;
 }
 
 interface Service {
   id: string;
-  client_name: string;
   barber_id: string;
   service_type: string;
   price: number;
-  service_time: string;
-  service_date: string;
-  notes?: string;
+  created_at: string;
   barber?: Barber;
 }
 
@@ -33,21 +29,15 @@ const ServicesManager = () => {
   const [loading, setLoading] = useState(true);
   
   const [newService, setNewService] = useState({
-    client_name: "",
     barber_id: "",
     service_type: "",
     price: "",
-    service_time: "",
-    notes: "",
   });
 
   const serviceTypes = [
-    { name: "Corte", price: 6 },
-    { name: "Barba", price: 3 },
-    { name: "Cejas", price: 1 },
-    { name: "Corte + Barba", price: 9 },
-    { name: "Barba + Cejas", price: 4 },
-    { name: "Servicio Completo", price: 10 },
+    { name: "corte", label: "Corte", price: 6 },
+    { name: "barba", label: "Barba", price: 3 },
+    { name: "ceja", label: "Cejas", price: 1 },
   ];
 
   useEffect(() => {
@@ -63,8 +53,7 @@ const ServicesManager = () => {
     try {
       const { data, error } = await supabase
         .from('barbers')
-        .select('id, name, status')
-        .eq('status', 'active')
+        .select('id, name')
         .order('name');
 
       if (error) throw error;
@@ -85,7 +74,7 @@ const ServicesManager = () => {
         .from('services')
         .select(`
           *,
-          barbers!inner(id, name, status)
+          barbers(id, name)
         `)
         .order('created_at', { ascending: false });
 
@@ -93,11 +82,10 @@ const ServicesManager = () => {
       
       const servicesWithBarber = data?.map(service => ({
         ...service,
-        barber: {
+        barber: service.barbers ? {
           id: service.barbers.id,
-          name: service.barbers.name,
-          status: service.barbers.status
-        }
+          name: service.barbers.name
+        } : undefined
       })) || [];
       
       setServices(servicesWithBarber);
@@ -121,7 +109,7 @@ const ServicesManager = () => {
   };
 
   const handleAddService = async () => {
-    if (!newService.client_name || !newService.barber_id || !newService.service_type || !newService.price || !newService.service_time) {
+    if (!newService.barber_id || !newService.service_type || !newService.price) {
       toast({
         title: "Error",
         description: "Por favor completa todos los campos obligatorios",
@@ -132,13 +120,9 @@ const ServicesManager = () => {
 
     try {
       const serviceData = {
-        client_name: newService.client_name,
         barber_id: newService.barber_id,
         service_type: newService.service_type,
         price: parseFloat(newService.price),
-        service_time: newService.service_time,
-        notes: newService.notes || null,
-        service_date: new Date().toISOString().split('T')[0],
       };
 
       const { data, error } = await supabase
@@ -146,44 +130,52 @@ const ServicesManager = () => {
         .insert([serviceData])
         .select(`
           *,
-          barbers!inner(id, name, status)
+          barbers(id, name)
         `)
         .single();
 
       if (error) throw error;
 
-      // Update barber stats using the database function
-      const { error: statsError } = await supabase.rpc('increment_barber_stats', {
-        barber_id: newService.barber_id,
-        service_price: parseFloat(newService.price)
-      });
+      // Update barber counts
+      const countColumn = newService.service_type === 'corte' ? 'cuts_count' 
+        : newService.service_type === 'barba' ? 'beards_count' 
+        : 'eyebrows_count';
 
-      if (statsError) {
-        console.error('Error updating barber stats:', statsError);
+      // Update barber count manually
+      const { data: currentBarber } = await supabase
+        .from('barbers')
+        .select('cuts_count, beards_count, eyebrows_count')
+        .eq('id', newService.barber_id)
+        .single();
+
+      if (currentBarber) {
+        const updateData: Record<string, number> = {};
+        updateData[countColumn] = ((currentBarber as Record<string, number>)[countColumn] || 0) + 1;
+        
+        await supabase
+          .from('barbers')
+          .update(updateData)
+          .eq('id', newService.barber_id);
       }
 
       const newServiceWithBarber = {
         ...data,
-        barber: {
+        barber: data.barbers ? {
           id: data.barbers.id,
-          name: data.barbers.name,
-          status: data.barbers.status
-        }
+          name: data.barbers.name
+        } : undefined
       };
 
       setServices(prev => [newServiceWithBarber, ...prev]);
       setNewService({
-        client_name: "",
         barber_id: "",
         service_type: "",
         price: "",
-        service_time: "",
-        notes: "",
       });
 
       toast({
         title: "Servicio agregado",
-        description: `Servicio para ${newService.client_name} registrado correctamente`,
+        description: "Servicio registrado correctamente",
       });
     } catch (error) {
       console.error('Error adding service:', error);
@@ -195,8 +187,8 @@ const ServicesManager = () => {
     }
   };
 
-  const handleDeleteService = async (serviceId: string, clientName: string) => {
-    if (!confirm(`¿Estás seguro de que deseas eliminar el servicio de ${clientName}?`)) {
+  const handleDeleteService = async (serviceId: string) => {
+    if (!confirm(`¿Estás seguro de que deseas eliminar este servicio?`)) {
       return;
     }
 
@@ -212,7 +204,7 @@ const ServicesManager = () => {
 
       toast({
         title: "Servicio eliminado",
-        description: `Servicio de ${clientName} eliminado correctamente`,
+        description: "Servicio eliminado correctamente",
       });
     } catch (error) {
       console.error('Error deleting service:', error);
@@ -224,8 +216,9 @@ const ServicesManager = () => {
     }
   };
 
+  const today = new Date().toISOString().split('T')[0];
   const totalToday = services
-    .filter(s => s.service_date === new Date().toISOString().split('T')[0])
+    .filter(s => s.created_at.startsWith(today))
     .reduce((sum, s) => sum + s.price, 0);
 
   if (loading) {
@@ -256,17 +249,7 @@ const ServicesManager = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="client_name">Cliente</Label>
-              <Input
-                id="client_name"
-                value={newService.client_name}
-                onChange={(e) => setNewService(prev => ({ ...prev, client_name: e.target.value }))}
-                placeholder="Nombre del cliente"
-              />
-            </div>
-            
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="barber_id">Barbero</Label>
               <Select value={newService.barber_id} onValueChange={(value) => setNewService(prev => ({ ...prev, barber_id: value }))}>
@@ -292,7 +275,7 @@ const ServicesManager = () => {
                 <SelectContent>
                   {serviceTypes.map((service) => (
                     <SelectItem key={service.name} value={service.name}>
-                      {service.name} - ${service.price}
+                      {service.label} - ${service.price}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -308,26 +291,6 @@ const ServicesManager = () => {
                 value={newService.price}
                 onChange={(e) => setNewService(prev => ({ ...prev, price: e.target.value }))}
                 placeholder="Precio"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="service_time">Hora</Label>
-              <Input
-                id="service_time"
-                type="time"
-                value={newService.service_time}
-                onChange={(e) => setNewService(prev => ({ ...prev, service_time: e.target.value }))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notas (opcional)</Label>
-              <Input
-                id="notes"
-                value={newService.notes}
-                onChange={(e) => setNewService(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Notas adicionales"
               />
             </div>
           </div>
@@ -356,14 +319,7 @@ const ServicesManager = () => {
                 key={service.id}
                 className="flex items-center justify-between p-4 rounded-lg bg-barbershop-light-gray hover:bg-secondary transition-colors"
               >
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <p className="font-semibold">{service.client_name}</p>
-                    <p className="text-sm text-muted-foreground flex items-center">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      {new Date(service.service_date).toLocaleDateString()}
-                    </p>
-                  </div>
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <p className="font-medium flex items-center">
                       <User className="h-4 w-4 mr-1" />
@@ -372,23 +328,18 @@ const ServicesManager = () => {
                     <p className="text-sm text-muted-foreground">Barbero</p>
                   </div>
                   <div>
-                    <p className="font-medium">{service.service_type}</p>
+                    <p className="font-medium capitalize">{service.service_type}</p>
                     <p className="text-sm text-muted-foreground flex items-center">
-                      <Clock className="h-4 w-4 mr-1" />
-                      {service.service_time || 'Sin hora'}
+                      <Calendar className="h-4 w-4 mr-1" />
+                      {new Date(service.created_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="text-right flex items-center justify-end space-x-2">
-                    <div>
-                      <p className="font-bold text-lg text-green-600">${service.price.toFixed(2)}</p>
-                      {service.notes && (
-                        <p className="text-xs text-muted-foreground">{service.notes}</p>
-                      )}
-                    </div>
+                  <div className="flex items-center justify-end space-x-2">
+                    <p className="font-bold text-lg text-green-600">${service.price.toFixed(2)}</p>
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={() => handleDeleteService(service.id, service.client_name)}
+                      onClick={() => handleDeleteService(service.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

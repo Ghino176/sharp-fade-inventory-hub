@@ -4,21 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Users, Scissors, DollarSign, Calendar, Plus, Trash2 } from "lucide-react";
+import { Users, Scissors, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Barber {
   id: string;
   name: string;
-  avatar_url: string | null;
   phone: string | null;
-  email: string | null;
-  start_date: string | null;
-  specialties: string[];
-  services_completed: number;
-  total_earnings: number;
-  status: string;
+  photo_url: string | null;
+  cuts_count: number;
+  beards_count: number;
+  eyebrows_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
 const BarbersManager = () => {
@@ -29,11 +28,8 @@ const BarbersManager = () => {
   const [newBarber, setNewBarber] = useState({
     name: "",
     phone: "",
-    email: "",
-    specialties: "",
   });
 
-  // Fetch barbers from Supabase
   useEffect(() => {
     fetchBarbers();
   }, []);
@@ -60,10 +56,10 @@ const BarbersManager = () => {
   };
 
   const handleAddBarber = async () => {
-    if (!newBarber.name || !newBarber.phone) {
+    if (!newBarber.name) {
       toast({
         title: "Error",
-        description: "Por favor completa los campos obligatorios (nombre y teléfono)",
+        description: "Por favor ingresa el nombre del barbero",
         variant: "destructive",
       });
       return;
@@ -73,11 +69,6 @@ const BarbersManager = () => {
       const barberData = {
         name: newBarber.name,
         phone: newBarber.phone || null,
-        email: newBarber.email || null,
-        specialties: newBarber.specialties.split(',').map(s => s.trim()).filter(s => s),
-        services_completed: 0,
-        total_earnings: 0,
-        status: 'active',
       };
 
       const { data, error } = await supabase
@@ -92,8 +83,6 @@ const BarbersManager = () => {
       setNewBarber({
         name: "",
         phone: "",
-        email: "",
-        specialties: "",
       });
       setIsAddingBarber(false);
 
@@ -117,15 +106,6 @@ const BarbersManager = () => {
     }
 
     try {
-      // Delete associated services first
-      const { error: servicesError } = await supabase
-        .from('services')
-        .delete()
-        .eq('barber_id', barberId);
-
-      if (servicesError) throw servicesError;
-
-      // Delete the barber
       const { error: barberError } = await supabase
         .from('barbers')
         .delete()
@@ -149,8 +129,8 @@ const BarbersManager = () => {
     }
   };
 
-  const totalTodayServices = barbers.reduce((sum, barber) => sum + barber.services_completed, 0);
-  const totalTodayEarnings = barbers.reduce((sum, barber) => sum + barber.total_earnings, 0);
+  const totalServices = barbers.reduce((sum, barber) => 
+    sum + barber.cuts_count + barber.beards_count + barber.eyebrows_count, 0);
 
   if (loading) {
     return (
@@ -172,14 +152,14 @@ const BarbersManager = () => {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="border-0 shadow-lg">
           <CardContent className="p-6">
             <div className="flex items-center space-x-3">
               <Users className="h-8 w-8 text-barbershop-silver" />
               <div>
                 <p className="text-2xl font-bold">{barbers.length}</p>
-                <p className="text-sm text-muted-foreground">Barberos Activos</p>
+                <p className="text-sm text-muted-foreground">Barberos</p>
               </div>
             </div>
           </CardContent>
@@ -190,20 +170,8 @@ const BarbersManager = () => {
             <div className="flex items-center space-x-3">
               <Scissors className="h-8 w-8 text-barbershop-silver" />
               <div>
-                <p className="text-2xl font-bold">{totalTodayServices}</p>
+                <p className="text-2xl font-bold">{totalServices}</p>
                 <p className="text-sm text-muted-foreground">Servicios Totales</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-lg">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-3">
-              <DollarSign className="h-8 w-8 text-barbershop-silver" />
-              <div>
-                <p className="text-2xl font-bold">${totalTodayEarnings}</p>
-                <p className="text-sm text-muted-foreground">Ingresos Totales</p>
               </div>
             </div>
           </CardContent>
@@ -229,33 +197,12 @@ const BarbersManager = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Teléfono *</Label>
+                <Label htmlFor="phone">Teléfono</Label>
                 <Input
                   id="phone"
                   value={newBarber.phone}
                   onChange={(e) => setNewBarber(prev => ({ ...prev, phone: e.target.value }))}
                   placeholder="+1234567890"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={newBarber.email}
-                  onChange={(e) => setNewBarber(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="email@ejemplo.com"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="specialties">Especialidades (separadas por coma)</Label>
-                <Input
-                  id="specialties"
-                  value={newBarber.specialties}
-                  onChange={(e) => setNewBarber(prev => ({ ...prev, specialties: e.target.value }))}
-                  placeholder="Corte, Barba, Fade"
                 />
               </div>
             </div>
@@ -279,64 +226,34 @@ const BarbersManager = () => {
             <CardHeader className="pb-3">
               <div className="flex items-center space-x-4">
                 <Avatar className="w-16 h-16">
-                  <AvatarImage src={barber.avatar_url || ""} alt={barber.name} />
+                  <AvatarImage src={barber.photo_url || ""} alt={barber.name} />
                   <AvatarFallback className="bg-barbershop-silver text-primary text-xl">
                     {barber.name.split(' ').map(n => n[0]).join('')}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
                   <h3 className="text-xl font-bold">{barber.name}</h3>
-                  <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                    {barber.status}
-                  </span>
+                  <p className="text-sm text-muted-foreground">{barber.phone || 'Sin teléfono'}</p>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {/* Contact Info */}
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Contacto:</p>
-                  <p className="text-sm">{barber.phone || 'Sin teléfono'}</p>
-                  {barber.email && <p className="text-sm">{barber.email}</p>}
-                </div>
-
-                {/* Specialties */}
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">Especialidades:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {barber.specialties.map((specialty, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 bg-barbershop-light-gray text-xs rounded-md"
-                      >
-                        {specialty}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
                 {/* Performance */}
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                <div className="grid grid-cols-3 gap-2 pt-4 border-t">
                   <div className="text-center">
-                    <p className="text-lg font-bold text-blue-600">{barber.services_completed}</p>
-                    <p className="text-xs text-muted-foreground">Servicios</p>
+                    <p className="text-lg font-bold text-blue-600">{barber.cuts_count}</p>
+                    <p className="text-xs text-muted-foreground">Cortes</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-lg font-bold text-green-600">${barber.total_earnings}</p>
-                    <p className="text-xs text-muted-foreground">Ganancias</p>
+                    <p className="text-lg font-bold text-green-600">{barber.beards_count}</p>
+                    <p className="text-xs text-muted-foreground">Barbas</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-purple-600">{barber.eyebrows_count}</p>
+                    <p className="text-xs text-muted-foreground">Cejas</p>
                   </div>
                 </div>
-
-                {/* Start Date */}
-                {barber.start_date && (
-                  <div className="flex items-center justify-center text-sm text-muted-foreground pt-2 border-t">
-                    <div className="flex items-center space-x-1">
-                      <Calendar className="h-4 w-4" />
-                      <span>Desde {new Date(barber.start_date).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                )}
 
                 {/* Delete Button */}
                 <div className="pt-2 border-t">
@@ -354,6 +271,12 @@ const BarbersManager = () => {
             </CardContent>
           </Card>
         ))}
+
+        {barbers.length === 0 && (
+          <div className="col-span-full text-center py-8 text-muted-foreground">
+            No hay barberos registrados
+          </div>
+        )}
       </div>
     </div>
   );
