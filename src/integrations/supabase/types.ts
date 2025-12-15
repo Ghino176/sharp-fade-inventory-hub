@@ -14,7 +14,107 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      barbers: {
+        Row: {
+          beards_count: number
+          created_at: string
+          cuts_count: number
+          eyebrows_count: number
+          id: string
+          name: string
+          phone: string | null
+          photo_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          beards_count?: number
+          created_at?: string
+          cuts_count?: number
+          eyebrows_count?: number
+          id?: string
+          name: string
+          phone?: string | null
+          photo_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          beards_count?: number
+          created_at?: string
+          cuts_count?: number
+          eyebrows_count?: number
+          id?: string
+          name?: string
+          phone?: string | null
+          photo_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inventory: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          min_stock: number
+          name: string
+          quantity: number
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          min_stock?: number
+          name: string
+          quantity?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          min_stock?: number
+          name?: string
+          quantity?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      services: {
+        Row: {
+          barber_id: string
+          created_at: string
+          id: string
+          price: number
+          service_type: string
+        }
+        Insert: {
+          barber_id: string
+          created_at?: string
+          id?: string
+          price: number
+          service_type: string
+        }
+        Update: {
+          barber_id?: string
+          created_at?: string
+          id?: string
+          price?: number
+          service_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: false
+            referencedRelation: "barbers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
