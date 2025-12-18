@@ -1,14 +1,19 @@
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { Badge } from "@/components/ui/badge";
 
 interface HeaderProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
+  userName?: string | null;
+  userRole?: 'admin' | 'user' | null;
 }
 
-const Header = ({ activeSection, onSectionChange }: HeaderProps) => {
+const Header = ({ activeSection, onSectionChange, userName, userRole }: HeaderProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { signOut } = useAuth();
 
   const navItems = [
     { id: "dashboard", label: "Dashboard" },
@@ -18,6 +23,10 @@ const Header = ({ activeSection, onSectionChange }: HeaderProps) => {
     { id: "weekly-stats", label: "Estadísticas" },
     { id: "data-manager", label: "Gestión" },
   ];
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
 
   return (
     <header className="bg-primary text-primary-foreground shadow-lg">
@@ -50,6 +59,26 @@ const Header = ({ activeSection, onSectionChange }: HeaderProps) => {
             ))}
           </nav>
 
+          {/* User Info & Logout (Desktop) */}
+          <div className="hidden md:flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <User className="h-5 w-5" />
+              <span className="text-sm">{userName || 'Usuario'}</span>
+              <Badge variant={userRole === 'admin' ? 'default' : 'secondary'} className="ml-1">
+                {userRole === 'admin' ? 'Admin' : 'Usuario'}
+              </Badge>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSignOut}
+              className="hover:bg-barbershop-charcoal"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Salir
+            </Button>
+          </div>
+
           {/* Mobile Menu Button */}
           <Button
             variant="ghost"
@@ -64,6 +93,17 @@ const Header = ({ activeSection, onSectionChange }: HeaderProps) => {
         {/* Mobile Navigation */}
         {isMenuOpen && (
           <nav className="mt-4 md:hidden">
+            {/* User Info (Mobile) */}
+            <div className="flex items-center justify-between px-4 py-2 mb-2 border-b border-primary-foreground/20">
+              <div className="flex items-center space-x-2">
+                <User className="h-5 w-5" />
+                <span className="text-sm">{userName || 'Usuario'}</span>
+                <Badge variant={userRole === 'admin' ? 'default' : 'secondary'}>
+                  {userRole === 'admin' ? 'Admin' : 'Usuario'}
+                </Badge>
+              </div>
+            </div>
+            
             <div className="space-y-2">
               {navItems.map((item) => (
                 <button
@@ -81,6 +121,14 @@ const Header = ({ activeSection, onSectionChange }: HeaderProps) => {
                   {item.label}
                 </button>
               ))}
+              
+              <button
+                onClick={handleSignOut}
+                className="block w-full text-left px-4 py-2 rounded-lg transition-all hover:bg-barbershop-charcoal text-red-300"
+              >
+                <LogOut className="h-4 w-4 inline mr-2" />
+                Cerrar Sesión
+              </button>
             </div>
           </nav>
         )}

@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import Dashboard from "@/components/Dashboard";
 import ServicesManager from "@/components/ServicesManager";
@@ -9,6 +11,26 @@ import DataManager from "@/components/DataManager";
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
+  const { user, loading, fullName, userRole } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   const renderContent = () => {
     switch (activeSection) {
@@ -31,7 +53,12 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header activeSection={activeSection} onSectionChange={setActiveSection} />
+      <Header 
+        activeSection={activeSection} 
+        onSectionChange={setActiveSection}
+        userName={fullName}
+        userRole={userRole}
+      />
       <main className="container mx-auto px-4 py-8">
         {renderContent()}
       </main>
