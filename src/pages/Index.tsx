@@ -6,7 +6,8 @@ import Dashboard from "@/components/Dashboard";
 import ServicesManager from "@/components/ServicesManager";
 import InventoryManager from "@/components/InventoryManager";
 import BarbersManager from "@/components/BarbersManager";
-import WeeklyStats from "@/components/WeeklyStats";
+import AdminStats from "@/components/AdminStats";
+import UserStats from "@/components/UserStats";
 import DataManager from "@/components/DataManager";
 
 const Index = () => {
@@ -43,7 +44,7 @@ const Index = () => {
       case "barbers":
         return <BarbersManager />;
       case "weekly-stats":
-        return <WeeklyStats />;
+        return userRole === 'admin' ? <AdminStats /> : <UserStats />;
       case "data-manager":
         return <DataManager />;
       default:

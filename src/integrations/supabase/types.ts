@@ -85,6 +85,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          barber_id: string | null
           created_at: string
           full_name: string
           id: string
@@ -92,6 +93,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          barber_id?: string | null
           created_at?: string
           full_name: string
           id?: string
@@ -99,13 +101,22 @@ export type Database = {
           user_id: string
         }
         Update: {
+          barber_id?: string | null
           created_at?: string
           full_name?: string
           id?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: false
+            referencedRelation: "barbers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       services: {
         Row: {
