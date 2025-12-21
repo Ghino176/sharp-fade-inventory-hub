@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarDays, Scissors } from "lucide-react";
+import { Scissors } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { startOfWeek, endOfWeek, format, addDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
+import WeekSelector from "./WeekSelector";
 
 interface DailyService {
   day: string;
@@ -20,27 +21,26 @@ const UserStats = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [dailyServices, setDailyServices] = useState<DailyService[]>([]);
-  const [weekRange, setWeekRange] = useState({ start: "", end: "" });
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [barberName, setBarberName] = useState<string | null>(null);
+  const [barberId, setBarberId] = useState<string | null>(null);
   const [noBarberLinked, setNoBarberLinked] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
-      fetchUserStats();
+      fetchBarberInfo();
     }
   }, [user]);
 
-  const fetchUserStats = async () => {
-    try {
-      const today = new Date();
-      const weekStart = startOfWeek(today, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
-      
-      setWeekRange({
-        start: format(weekStart, "dd/MM/yyyy"),
-        end: format(weekEnd, "dd/MM/yyyy"),
-      });
+  useEffect(() => {
+    if (barberId) {
+      fetchUserStats();
+    }
+  }, [barberId, selectedDate]);
 
+  const fetchBarberInfo = async () => {
+    try {
       // Get the barber linked to this user
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
@@ -50,6 +50,7 @@ const UserStats = () => {
 
       if (profileError || !profileData?.barber_id) {
         setNoBarberLinked(true);
+        setLoading(false);
         return;
       }
 
@@ -64,11 +65,26 @@ const UserStats = () => {
         setBarberName(barberData.name);
       }
 
-      // Fetch services for this barber this week
+      setBarberId(profileData.barber_id);
+    } catch (error) {
+      console.error("Error fetching barber info:", error);
+      setLoading(false);
+    }
+  };
+
+  const fetchUserStats = async () => {
+    if (!barberId) return;
+    
+    setLoading(true);
+    try {
+      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
+
+      // Fetch services for this barber in selected week
       const { data: services, error: servicesError } = await supabase
         .from("services")
         .select("service_type, created_at")
-        .eq("barber_id", profileData.barber_id)
+        .eq("barber_id", barberId)
         .gte("created_at", weekStart.toISOString())
         .lte("created_at", weekEnd.toISOString());
 
@@ -103,6 +119,8 @@ const UserStats = () => {
         description: "No se pudieron cargar tus estadísticas",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -123,63 +141,68 @@ const UserStats = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2 className="text-3xl font-bold">Mis Estadísticas {barberName && `- ${barberName}`}</h2>
-        <div className="flex items-center space-x-2 text-muted-foreground">
-          <CalendarDays className="h-5 w-5" />
-          <span>{weekRange.start} - {weekRange.end}</span>
-        </div>
+        <WeekSelector selectedDate={selectedDate} onWeekChange={setSelectedDate} />
       </div>
 
-      <Card className="border-0 shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Scissors className="h-5 w-5" />
-            <span>Servicios de la Semana</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Día</TableHead>
-                <TableHead className="text-center">Cortes</TableHead>
-                <TableHead className="text-center">Barbas</TableHead>
-                <TableHead className="text-center">Cejas</TableHead>
-                <TableHead className="text-center">Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {dailyServices.map((day) => (
-                <TableRow key={day.day}>
-                  <TableCell className="font-medium">{day.dayName}</TableCell>
-                  <TableCell className="text-center">{day.cortes}</TableCell>
-                  <TableCell className="text-center">{day.barbas}</TableCell>
-                  <TableCell className="text-center">{day.cejas}</TableCell>
-                  <TableCell className="text-center font-bold">
-                    {day.cortes + day.barbas + day.cejas}
+      {loading ? (
+        <Card className="border-0 shadow-lg">
+          <CardContent className="py-8">
+            <p className="text-center text-muted-foreground">Cargando estadísticas...</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-0 shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Scissors className="h-5 w-5" />
+              <span>Servicios de la Semana</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Día</TableHead>
+                  <TableHead className="text-center">Cortes</TableHead>
+                  <TableHead className="text-center">Barbas</TableHead>
+                  <TableHead className="text-center">Cejas</TableHead>
+                  <TableHead className="text-center">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dailyServices.map((day) => (
+                  <TableRow key={day.day}>
+                    <TableCell className="font-medium">{day.dayName}</TableCell>
+                    <TableCell className="text-center">{day.cortes}</TableCell>
+                    <TableCell className="text-center">{day.barbas}</TableCell>
+                    <TableCell className="text-center">{day.cejas}</TableCell>
+                    <TableCell className="text-center font-bold">
+                      {day.cortes + day.barbas + day.cejas}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="bg-muted/50 font-bold">
+                  <TableCell>Total Semana</TableCell>
+                  <TableCell className="text-center">
+                    {dailyServices.reduce((sum, d) => sum + d.cortes, 0)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {dailyServices.reduce((sum, d) => sum + d.barbas, 0)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {dailyServices.reduce((sum, d) => sum + d.cejas, 0)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {dailyServices.reduce((sum, d) => sum + d.cortes + d.barbas + d.cejas, 0)}
                   </TableCell>
                 </TableRow>
-              ))}
-              <TableRow className="bg-muted/50 font-bold">
-                <TableCell>Total Semana</TableCell>
-                <TableCell className="text-center">
-                  {dailyServices.reduce((sum, d) => sum + d.cortes, 0)}
-                </TableCell>
-                <TableCell className="text-center">
-                  {dailyServices.reduce((sum, d) => sum + d.barbas, 0)}
-                </TableCell>
-                <TableCell className="text-center">
-                  {dailyServices.reduce((sum, d) => sum + d.cejas, 0)}
-                </TableCell>
-                <TableCell className="text-center">
-                  {dailyServices.reduce((sum, d) => sum + d.cortes + d.barbas + d.cejas, 0)}
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
