@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Users, Scissors, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import UserBarberLink from "./UserBarberLink";
 
 interface Barber {
   id: string;
@@ -278,6 +279,9 @@ const BarbersManager = () => {
           </div>
         )}
       </div>
+
+      {/* User-Barber Linking Section */}
+      <UserBarberLink />
     </div>
   );
 };
