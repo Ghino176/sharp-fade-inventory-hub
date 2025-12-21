@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { User } from "lucide-react";
+import { User, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { startOfWeek, endOfWeek, format, addDays, parseISO } from "date-fns";
@@ -17,7 +17,9 @@ interface BarberDailyStats {
     cortes: number;
     barbas: number;
     cejas: number;
+    ganancias: number;
   }[];
+  totalGanancias: number;
 }
 
 const AdminStats = () => {
@@ -43,10 +45,10 @@ const AdminStats = () => {
 
       if (barbersError) throw barbersError;
 
-      // Fetch services from selected week
+      // Fetch services from selected week with price
       const { data: services, error: servicesError } = await supabase
         .from("services")
-        .select("barber_id, service_type, created_at")
+        .select("barber_id, service_type, created_at, price")
         .gte("created_at", weekStart.toISOString())
         .lte("created_at", weekEnd.toISOString());
 
@@ -58,6 +60,8 @@ const AdminStats = () => {
         
         // Generate days Mon-Sat
         const dailyServices = [];
+        let totalGanancias = 0;
+        
         for (let i = 0; i < 6; i++) {
           const day = addDays(weekStart, i);
           const dayStr = format(day, "yyyy-MM-dd");
@@ -68,12 +72,16 @@ const AdminStats = () => {
             return serviceDate === dayStr;
           });
 
+          const dayGanancias = dayServices.reduce((sum, s) => sum + Number(s.price || 0), 0);
+          totalGanancias += dayGanancias;
+
           dailyServices.push({
             day: dayStr,
             dayName: dayName.charAt(0).toUpperCase() + dayName.slice(1),
             cortes: dayServices.filter((s) => s.service_type.toLowerCase().includes("corte")).length,
             barbas: dayServices.filter((s) => s.service_type.toLowerCase().includes("barba")).length,
             cejas: dayServices.filter((s) => s.service_type.toLowerCase().includes("ceja")).length,
+            ganancias: dayGanancias,
           });
         }
 
@@ -81,6 +89,7 @@ const AdminStats = () => {
           barberId: barber.id,
           barberName: barber.name,
           dailyServices,
+          totalGanancias,
         };
       });
 
@@ -95,6 +104,13 @@ const AdminStats = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: "MXN",
+    }).format(amount);
   };
 
   return (
@@ -115,10 +131,16 @@ const AdminStats = () => {
           {barberStats.map((barber) => (
             <Card key={barber.barberId} className="border-0 shadow-lg">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <User className="h-5 w-5" />
-                  <span>{barber.barberName}</span>
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center space-x-2">
+                    <User className="h-5 w-5" />
+                    <span>{barber.barberName}</span>
+                  </CardTitle>
+                  <div className="flex items-center gap-2 text-lg font-bold text-green-600">
+                    <DollarSign className="h-5 w-5" />
+                    {formatCurrency(barber.totalGanancias)}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -129,6 +151,7 @@ const AdminStats = () => {
                       <TableHead className="text-center">Barbas</TableHead>
                       <TableHead className="text-center">Cejas</TableHead>
                       <TableHead className="text-center">Total</TableHead>
+                      <TableHead className="text-right">Ganancias</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -140,6 +163,9 @@ const AdminStats = () => {
                         <TableCell className="text-center">{day.cejas}</TableCell>
                         <TableCell className="text-center font-bold">
                           {day.cortes + day.barbas + day.cejas}
+                        </TableCell>
+                        <TableCell className="text-right text-green-600 font-medium">
+                          {formatCurrency(day.ganancias)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -156,6 +182,9 @@ const AdminStats = () => {
                       </TableCell>
                       <TableCell className="text-center">
                         {barber.dailyServices.reduce((sum, d) => sum + d.cortes + d.barbas + d.cejas, 0)}
+                      </TableCell>
+                      <TableCell className="text-right text-green-600">
+                        {formatCurrency(barber.totalGanancias)}
                       </TableCell>
                     </TableRow>
                   </TableBody>
