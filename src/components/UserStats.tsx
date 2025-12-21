@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Scissors } from "lucide-react";
+import { Scissors, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,6 +15,7 @@ interface DailyService {
   cortes: number;
   barbas: number;
   cejas: number;
+  ganancias: number;
 }
 
 const UserStats = () => {
@@ -26,6 +27,7 @@ const UserStats = () => {
   const [barberId, setBarberId] = useState<string | null>(null);
   const [noBarberLinked, setNoBarberLinked] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [totalGanancias, setTotalGanancias] = useState(0);
 
   useEffect(() => {
     if (user) {
@@ -46,7 +48,7 @@ const UserStats = () => {
         .from("profiles")
         .select("barber_id")
         .eq("user_id", user!.id)
-        .single();
+        .maybeSingle();
 
       if (profileError || !profileData?.barber_id) {
         setNoBarberLinked(true);
@@ -59,7 +61,7 @@ const UserStats = () => {
         .from("barbers")
         .select("name")
         .eq("id", profileData.barber_id)
-        .single();
+        .maybeSingle();
 
       if (barberData) {
         setBarberName(barberData.name);
@@ -80,10 +82,10 @@ const UserStats = () => {
       const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
       const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
 
-      // Fetch services for this barber in selected week
+      // Fetch services for this barber in selected week with price
       const { data: services, error: servicesError } = await supabase
         .from("services")
-        .select("service_type, created_at")
+        .select("service_type, created_at, price")
         .eq("barber_id", barberId)
         .gte("created_at", weekStart.toISOString())
         .lte("created_at", weekEnd.toISOString());
@@ -92,6 +94,8 @@ const UserStats = () => {
 
       // Process daily stats (Mon-Sat)
       const stats: DailyService[] = [];
+      let weekTotal = 0;
+      
       for (let i = 0; i < 6; i++) {
         const day = addDays(weekStart, i);
         const dayStr = format(day, "yyyy-MM-dd");
@@ -102,16 +106,21 @@ const UserStats = () => {
           return serviceDate === dayStr;
         });
 
+        const dayGanancias = dayServices.reduce((sum, s) => sum + Number(s.price || 0), 0);
+        weekTotal += dayGanancias;
+
         stats.push({
           day: dayStr,
           dayName: dayName.charAt(0).toUpperCase() + dayName.slice(1),
           cortes: dayServices.filter((s) => s.service_type.toLowerCase().includes("corte")).length,
           barbas: dayServices.filter((s) => s.service_type.toLowerCase().includes("barba")).length,
           cejas: dayServices.filter((s) => s.service_type.toLowerCase().includes("ceja")).length,
+          ganancias: dayGanancias,
         });
       }
 
       setDailyServices(stats);
+      setTotalGanancias(weekTotal);
     } catch (error) {
       console.error("Error fetching user stats:", error);
       toast({
@@ -122,6 +131,13 @@ const UserStats = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: "MXN",
+    }).format(amount);
   };
 
   if (noBarberLinked) {
@@ -155,10 +171,16 @@ const UserStats = () => {
       ) : (
         <Card className="border-0 shadow-lg">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Scissors className="h-5 w-5" />
-              <span>Servicios de la Semana</span>
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center space-x-2">
+                <Scissors className="h-5 w-5" />
+                <span>Servicios de la Semana</span>
+              </CardTitle>
+              <div className="flex items-center gap-2 text-lg font-bold text-green-600">
+                <DollarSign className="h-5 w-5" />
+                {formatCurrency(totalGanancias)}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
@@ -169,6 +191,7 @@ const UserStats = () => {
                   <TableHead className="text-center">Barbas</TableHead>
                   <TableHead className="text-center">Cejas</TableHead>
                   <TableHead className="text-center">Total</TableHead>
+                  <TableHead className="text-right">Ganancias</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -180,6 +203,9 @@ const UserStats = () => {
                     <TableCell className="text-center">{day.cejas}</TableCell>
                     <TableCell className="text-center font-bold">
                       {day.cortes + day.barbas + day.cejas}
+                    </TableCell>
+                    <TableCell className="text-right text-green-600 font-medium">
+                      {formatCurrency(day.ganancias)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -196,6 +222,9 @@ const UserStats = () => {
                   </TableCell>
                   <TableCell className="text-center">
                     {dailyServices.reduce((sum, d) => sum + d.cortes + d.barbas + d.cejas, 0)}
+                  </TableCell>
+                  <TableCell className="text-right text-green-600">
+                    {formatCurrency(totalGanancias)}
                   </TableCell>
                 </TableRow>
               </TableBody>
