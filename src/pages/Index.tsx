@@ -8,6 +8,7 @@ import InventoryManager from "@/components/InventoryManager";
 import BarbersManager from "@/components/BarbersManager";
 import AdminStats from "@/components/AdminStats";
 import UserStats from "@/components/UserStats";
+import ManuelStats from "@/components/ManuelStats";
 import DataManager from "@/components/DataManager";
 
 const Index = () => {
@@ -45,6 +46,8 @@ const Index = () => {
         return <BarbersManager />;
       case "weekly-stats":
         return userRole === 'admin' ? <AdminStats /> : <UserStats />;
+      case "manuel-stats":
+        return userRole === 'admin' ? <ManuelStats /> : <Dashboard />;
       case "data-manager":
         return <DataManager />;
       default:
