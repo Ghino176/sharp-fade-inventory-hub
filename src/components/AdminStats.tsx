@@ -45,10 +45,10 @@ const AdminStats = () => {
 
       if (barbersError) throw barbersError;
 
-      // Fetch services from selected week with price
+      // Fetch services from selected week with barber_earning
       const { data: services, error: servicesError } = await supabase
         .from("services")
-        .select("barber_id, service_type, created_at, price")
+        .select("barber_id, service_type, created_at, barber_earning")
         .gte("created_at", weekStart.toISOString())
         .lte("created_at", weekEnd.toISOString());
 
@@ -72,7 +72,7 @@ const AdminStats = () => {
             return serviceDate === dayStr;
           });
 
-          const dayGanancias = dayServices.reduce((sum, s) => sum + Number(s.price || 0), 0);
+          const dayGanancias = dayServices.reduce((sum, s) => sum + Number(s.barber_earning || 0), 0);
           totalGanancias += dayGanancias;
 
           dailyServices.push({
