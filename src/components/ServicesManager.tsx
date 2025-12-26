@@ -18,6 +18,7 @@ interface Service {
   barber_id: string;
   service_type: string;
   price: number;
+  barber_earning: number;
   created_at: string;
   barber?: Barber;
 }
@@ -32,12 +33,19 @@ const ServicesManager = () => {
     barber_id: "",
     service_type: "",
     price: "",
+    barber_earning: "",
   });
 
   const serviceTypes = [
-    { name: "corte", label: "Corte", price: 6 },
-    { name: "barba", label: "Barba", price: 3 },
-    { name: "ceja", label: "Cejas", price: 1 },
+    { name: "Corte", label: "Corte", price: 7, earning: 4 },
+    { name: "Barba Sencilla", label: "Barba Sencilla", price: 2, earning: 1 },
+    { name: "Barba Premium", label: "Barba Premium", price: 4, earning: 2 },
+    { name: "Cejas", label: "Cejas", price: 1, earning: 0.5 },
+    { name: "Afeitado", label: "Afeitado", price: 2, earning: 1 },
+    { name: "Facial Primera Vez", label: "Facial Primera Vez", price: 7, earning: 4 },
+    { name: "Facial", label: "Facial", price: 8, earning: 5 },
+    { name: "Corte+Barba Premium", label: "Corte+Barba Premium", price: 10, earning: 6 },
+    { name: "Mascarilla Completa", label: "Mascarilla Completa", price: 1, earning: 0.5 },
   ];
 
   useEffect(() => {
@@ -104,7 +112,8 @@ const ServicesManager = () => {
     setNewService(prev => ({
       ...prev,
       service_type: serviceType,
-      price: selectedService ? selectedService.price.toString() : ""
+      price: selectedService ? selectedService.price.toString() : "",
+      barber_earning: selectedService ? selectedService.earning.toString() : ""
     }));
   };
 
@@ -123,6 +132,7 @@ const ServicesManager = () => {
         barber_id: newService.barber_id,
         service_type: newService.service_type,
         price: parseFloat(newService.price),
+        barber_earning: parseFloat(newService.barber_earning || "0"),
       };
 
       const { data, error } = await supabase
@@ -171,6 +181,7 @@ const ServicesManager = () => {
         barber_id: "",
         service_type: "",
         price: "",
+        barber_earning: "",
       });
 
       toast({

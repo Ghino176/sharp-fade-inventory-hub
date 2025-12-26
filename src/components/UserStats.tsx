@@ -82,10 +82,10 @@ const UserStats = () => {
       const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
       const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
 
-      // Fetch services for this barber in selected week with price
+      // Fetch services for this barber in selected week with barber_earning
       const { data: services, error: servicesError } = await supabase
         .from("services")
-        .select("service_type, created_at, price")
+        .select("service_type, created_at, barber_earning")
         .eq("barber_id", barberId)
         .gte("created_at", weekStart.toISOString())
         .lte("created_at", weekEnd.toISOString());
@@ -106,7 +106,7 @@ const UserStats = () => {
           return serviceDate === dayStr;
         });
 
-        const dayGanancias = dayServices.reduce((sum, s) => sum + Number(s.price || 0), 0);
+        const dayGanancias = dayServices.reduce((sum, s) => sum + Number(s.barber_earning || 0), 0);
         weekTotal += dayGanancias;
 
         stats.push({
