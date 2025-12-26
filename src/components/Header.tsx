@@ -15,7 +15,7 @@ const Header = ({ activeSection, onSectionChange, userName, userRole }: HeaderPr
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { signOut } = useAuth();
 
-  const navItems = [
+  const baseNavItems = [
     { id: "dashboard", label: "Dashboard" },
     { id: "services", label: "Servicios" },
     { id: "inventory", label: "Inventario" },
@@ -23,6 +23,11 @@ const Header = ({ activeSection, onSectionChange, userName, userRole }: HeaderPr
     { id: "weekly-stats", label: "Estadísticas" },
     { id: "data-manager", label: "Gestión" },
   ];
+
+  // Add Manuel stats only for admins
+  const navItems = userRole === 'admin' 
+    ? [...baseNavItems, { id: "manuel-stats", label: "Manuel" }]
+    : baseNavItems;
 
   const handleSignOut = async () => {
     await signOut();
