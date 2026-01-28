@@ -105,7 +105,7 @@ const UserBarberLink = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Link2 className="h-5 w-5" />
-          Vincular Usuarios con Barberos
+          Vincular Usuarios con Empleados
         </CardTitle>
       </CardHeader>
       <CardContent>
