@@ -37,7 +37,7 @@ const ServicesManager = () => {
   });
 
   const serviceTypes = [
-    { name: "Corte", label: "Corte", earning: 4.5 },
+    { name: "Corte", label: "Corte", earning: 4.6 },
     { name: "Barba Sencilla", label: "Barba Sencilla", earning: 1 },
     { name: "Barba Premium", label: "Barba Premium", earning: 2 },
     { name: "Cejas", label: "Cejas", earning: 0.5 },
