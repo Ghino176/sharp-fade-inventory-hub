@@ -8,18 +8,34 @@ import { startOfWeek, endOfWeek, format, addDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import WeekSelector from "./WeekSelector";
 
+// All service types offered
+const allServiceTypes = [
+  "Corte",
+  "Barba Sencilla",
+  "Barba Premium",
+  "Cejas",
+  "Afeitado",
+  "Facial Primera Vez",
+  "Facial",
+  "Corte+Barba Premium",
+  "Mascarilla Completa",
+];
+
+interface DailyServiceCounts {
+  [key: string]: number;
+}
+
 interface BarberDailyStats {
   barberId: string;
   barberName: string;
   dailyServices: {
     day: string;
     dayName: string;
-    cortes: number;
-    barbas: number;
-    cejas: number;
+    serviceCounts: DailyServiceCounts;
     ganancias: number;
   }[];
   totalGanancias: number;
+  weeklyServiceCounts: DailyServiceCounts;
 }
 
 const AdminStats = () => {
@@ -61,6 +77,12 @@ const AdminStats = () => {
         // Generate days Mon-Sat
         const dailyServices = [];
         let totalGanancias = 0;
+        const weeklyServiceCounts: DailyServiceCounts = {};
+        
+        // Initialize weekly counts
+        allServiceTypes.forEach(type => {
+          weeklyServiceCounts[type] = 0;
+        });
         
         for (let i = 0; i < 6; i++) {
           const day = addDays(weekStart, i);
@@ -75,12 +97,18 @@ const AdminStats = () => {
           const dayGanancias = dayServices.reduce((sum, s) => sum + Number(s.barber_earning || 0), 0);
           totalGanancias += dayGanancias;
 
+          // Count each service type
+          const serviceCounts: DailyServiceCounts = {};
+          allServiceTypes.forEach(type => {
+            const count = dayServices.filter((s) => s.service_type === type).length;
+            serviceCounts[type] = count;
+            weeklyServiceCounts[type] += count;
+          });
+
           dailyServices.push({
             day: dayStr,
             dayName: dayName.charAt(0).toUpperCase() + dayName.slice(1),
-            cortes: dayServices.filter((s) => s.service_type.toLowerCase().includes("corte")).length,
-            barbas: dayServices.filter((s) => s.service_type.toLowerCase().includes("barba")).length,
-            cejas: dayServices.filter((s) => s.service_type.toLowerCase().includes("ceja")).length,
+            serviceCounts,
             ganancias: dayGanancias,
           });
         }
@@ -90,6 +118,7 @@ const AdminStats = () => {
           barberName: barber.name,
           dailyServices,
           totalGanancias,
+          weeklyServiceCounts,
         };
       });
 
@@ -109,7 +138,7 @@ const AdminStats = () => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("es-MX", {
       style: "currency",
-      currency: "MXN",
+      currency: "USD",
     }).format(amount);
   };
 
@@ -142,46 +171,47 @@ const AdminStats = () => {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Día</TableHead>
-                      <TableHead className="text-center">Cortes</TableHead>
-                      <TableHead className="text-center">Barbas</TableHead>
-                      <TableHead className="text-center">Cejas</TableHead>
+                      <TableHead className="min-w-[100px]">Día</TableHead>
+                      {allServiceTypes.map((type) => (
+                        <TableHead key={type} className="text-center min-w-[80px] text-xs">
+                          {type}
+                        </TableHead>
+                      ))}
                       <TableHead className="text-center">Total</TableHead>
                       <TableHead className="text-right">Ganancias</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {barber.dailyServices.map((day) => (
-                      <TableRow key={day.day}>
-                        <TableCell className="font-medium">{day.dayName}</TableCell>
-                        <TableCell className="text-center">{day.cortes}</TableCell>
-                        <TableCell className="text-center">{day.barbas}</TableCell>
-                        <TableCell className="text-center">{day.cejas}</TableCell>
-                        <TableCell className="text-center font-bold">
-                          {day.cortes + day.barbas + day.cejas}
-                        </TableCell>
-                        <TableCell className="text-right text-green-600 font-medium">
-                          {formatCurrency(day.ganancias)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {barber.dailyServices.map((day) => {
+                      const dayTotal = Object.values(day.serviceCounts).reduce((a, b) => a + b, 0);
+                      return (
+                        <TableRow key={day.day}>
+                          <TableCell className="font-medium">{day.dayName}</TableCell>
+                          {allServiceTypes.map((type) => (
+                            <TableCell key={type} className="text-center">
+                              {day.serviceCounts[type] || 0}
+                            </TableCell>
+                          ))}
+                          <TableCell className="text-center font-bold">{dayTotal}</TableCell>
+                          <TableCell className="text-right text-green-600 font-medium">
+                            {formatCurrency(day.ganancias)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                     <TableRow className="bg-muted/50 font-bold">
                       <TableCell>Total Semana</TableCell>
+                      {allServiceTypes.map((type) => (
+                        <TableCell key={type} className="text-center">
+                          {barber.weeklyServiceCounts[type] || 0}
+                        </TableCell>
+                      ))}
                       <TableCell className="text-center">
-                        {barber.dailyServices.reduce((sum, d) => sum + d.cortes, 0)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {barber.dailyServices.reduce((sum, d) => sum + d.barbas, 0)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {barber.dailyServices.reduce((sum, d) => sum + d.cejas, 0)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {barber.dailyServices.reduce((sum, d) => sum + d.cortes + d.barbas + d.cejas, 0)}
+                        {Object.values(barber.weeklyServiceCounts).reduce((a, b) => a + b, 0)}
                       </TableCell>
                       <TableCell className="text-right text-green-600">
                         {formatCurrency(barber.totalGanancias)}

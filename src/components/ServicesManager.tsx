@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Scissors, DollarSign, Calendar, User, Trash2 } from "lucide-react";
+import { Plus, Scissors, DollarSign, Calendar, User, Trash2, Gift } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -32,18 +32,20 @@ const ServicesManager = () => {
   const [newService, setNewService] = useState({
     barber_id: "",
     service_type: "",
-    price: "",
     barber_earning: "",
+    tip: "",
   });
 
   const serviceTypes = [
-    { name: "Corte", label: "Corte", price: 8, earning: 4.5 },
-    { name: "Barba Sencilla", label: "Barba Sencilla", price: 2, earning: 1 },
-    { name: "Barba Premium", label: "Barba Premium", price: 4, earning: 2 },
-    { name: "Cejas", label: "Cejas", price: 1, earning: 0.5 },
-    { name: "Facial Primera Vez", label: "Facial Primera Vez", price: 7, earning: 4 },
-    { name: "Facial", label: "Facial", price: 8, earning: 5 },
-    { name: "Mascarilla Completa", label: "Mascarilla Completa", price: 1, earning: 0.5 },
+    { name: "Corte", label: "Corte", earning: 4.5 },
+    { name: "Barba Sencilla", label: "Barba Sencilla", earning: 1 },
+    { name: "Barba Premium", label: "Barba Premium", earning: 2 },
+    { name: "Cejas", label: "Cejas", earning: 0.5 },
+    { name: "Afeitado", label: "Afeitado", earning: 1 },
+    { name: "Facial Primera Vez", label: "Facial Primera Vez", earning: 4 },
+    { name: "Facial", label: "Facial", earning: 5 },
+    { name: "Corte+Barba Premium", label: "Corte+Barba Premium", earning: 6.5 },
+    { name: "Mascarilla Completa", label: "Mascarilla Completa", earning: 0.5 },
   ];
 
   useEffect(() => {
@@ -110,27 +112,30 @@ const ServicesManager = () => {
     setNewService(prev => ({
       ...prev,
       service_type: serviceType,
-      price: selectedService ? selectedService.price.toString() : "",
       barber_earning: selectedService ? selectedService.earning.toString() : ""
     }));
   };
 
   const handleAddService = async () => {
-    if (!newService.barber_id || !newService.service_type || !newService.price) {
+    if (!newService.barber_id || !newService.service_type) {
       toast({
         title: "Error",
-        description: "Por favor completa todos los campos obligatorios",
+        description: "Por favor selecciona barbero y servicio",
         variant: "destructive",
       });
       return;
     }
 
     try {
+      const baseEarning = parseFloat(newService.barber_earning || "0");
+      const tip = parseFloat(newService.tip || "0");
+      const totalEarning = baseEarning + tip;
+
       const serviceData = {
         barber_id: newService.barber_id,
         service_type: newService.service_type,
-        price: parseFloat(newService.price),
-        barber_earning: parseFloat(newService.barber_earning || "0"),
+        price: 0, // No longer used but required by schema
+        barber_earning: totalEarning,
       };
 
       const { data, error } = await supabase
@@ -145,8 +150,8 @@ const ServicesManager = () => {
       if (error) throw error;
 
       // Update barber counts
-      const countColumn = newService.service_type === 'corte' ? 'cuts_count' 
-        : newService.service_type === 'barba' ? 'beards_count' 
+      const countColumn = newService.service_type.toLowerCase().includes('corte') ? 'cuts_count' 
+        : newService.service_type.toLowerCase().includes('barba') ? 'beards_count' 
         : 'eyebrows_count';
 
       // Update barber count manually
@@ -178,13 +183,13 @@ const ServicesManager = () => {
       setNewService({
         barber_id: "",
         service_type: "",
-        price: "",
         barber_earning: "",
+        tip: "",
       });
 
       toast({
         title: "Servicio agregado",
-        description: "Servicio registrado correctamente",
+        description: tip > 0 ? `Servicio registrado con propina de $${tip.toFixed(2)}` : "Servicio registrado correctamente",
       });
     } catch (error) {
       console.error('Error adding service:', error);
@@ -228,7 +233,7 @@ const ServicesManager = () => {
   const today = new Date().toISOString().split('T')[0];
   const totalToday = services
     .filter(s => s.created_at.startsWith(today))
-    .reduce((sum, s) => sum + s.price, 0);
+    .reduce((sum, s) => sum + s.barber_earning, 0);
 
   if (loading) {
     return (
@@ -245,7 +250,7 @@ const ServicesManager = () => {
         <h2 className="text-3xl font-bold">Gestión de Servicios</h2>
         <div className="flex items-center space-x-2 text-lg font-semibold">
           <DollarSign className="h-5 w-5" />
-          <span>Total Hoy: ${totalToday.toFixed(2)}</span>
+          <span>Ganancias Hoy: ${totalToday.toFixed(2)}</span>
         </div>
       </div>
 
@@ -284,7 +289,7 @@ const ServicesManager = () => {
                 <SelectContent>
                   {serviceTypes.map((service) => (
                     <SelectItem key={service.name} value={service.name}>
-                      {service.label} - ${service.price}
+                      {service.label} (${service.earning})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -292,17 +297,39 @@ const ServicesManager = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="price">Precio</Label>
+              <Label htmlFor="tip" className="flex items-center gap-1">
+                <Gift className="h-4 w-4" />
+                Propina
+              </Label>
               <Input
-                id="price"
+                id="tip"
                 type="number"
                 step="0.01"
-                value={newService.price}
-                onChange={(e) => setNewService(prev => ({ ...prev, price: e.target.value }))}
-                placeholder="Precio"
+                min="0"
+                value={newService.tip}
+                onChange={(e) => setNewService(prev => ({ ...prev, tip: e.target.value }))}
+                placeholder="0.00"
               />
             </div>
           </div>
+          
+          {newService.service_type && (
+            <div className="mt-4 p-3 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                Ganancia base: <span className="font-semibold">${parseFloat(newService.barber_earning || "0").toFixed(2)}</span>
+                {newService.tip && parseFloat(newService.tip) > 0 && (
+                  <>
+                    {" + Propina: "}
+                    <span className="font-semibold text-green-600">${parseFloat(newService.tip).toFixed(2)}</span>
+                    {" = Total: "}
+                    <span className="font-bold text-green-600">
+                      ${(parseFloat(newService.barber_earning || "0") + parseFloat(newService.tip || "0")).toFixed(2)}
+                    </span>
+                  </>
+                )}
+              </p>
+            </div>
+          )}
           
           <div className="mt-4">
             <Button onClick={handleAddService} className="w-full md:w-auto">
@@ -326,7 +353,7 @@ const ServicesManager = () => {
             {services.map((service) => (
               <div
                 key={service.id}
-                className="flex items-center justify-between p-4 rounded-lg bg-barbershop-light-gray hover:bg-secondary transition-colors"
+                className="flex items-center justify-between p-4 rounded-lg bg-muted hover:bg-secondary transition-colors"
               >
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
@@ -344,7 +371,7 @@ const ServicesManager = () => {
                     </p>
                   </div>
                   <div className="flex items-center justify-end space-x-2">
-                    <p className="font-bold text-lg text-green-600">${service.price.toFixed(2)}</p>
+                    <p className="font-bold text-lg text-green-600">${service.barber_earning.toFixed(2)}</p>
                     <Button
                       variant="destructive"
                       size="sm"
