@@ -17,11 +17,11 @@ const Header = ({ activeSection, onSectionChange, userName, userRole }: HeaderPr
 
   const baseNavItems = [
     { id: "dashboard", label: "Dashboard" },
-    { id: "services", label: "Servicios" },
-    { id: "inventory", label: "Inventario" },
+    { id: "services", label: "Services" },
+    { id: "inventory", label: "Inventory" },
     { id: "barbers", label: "Barberos" },
-    { id: "weekly-stats", label: "Estadísticas" },
-    { id: "data-manager", label: "Gestión" },
+    { id: "weekly-stats", label: "Stats" },
+    { id: "data-manager", label: "Management" },
   ];
 
   // Add Manuel stats only for admins
