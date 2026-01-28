@@ -477,6 +477,76 @@ const ManuelStats = () => {
             </CardContent>
           </Card>
 
+          {/* Product Sales Count Card */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Package className="h-5 w-5 text-purple-500" />
+                <span>Conteo de Productos Vendidos</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {inventoryOutputs.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Producto</TableHead>
+                      <TableHead className="text-center">Unidades Vendidas</TableHead>
+                      <TableHead className="text-right">Ingresos Totales</TableHead>
+                      <TableHead className="text-right">Ganancia Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(() => {
+                      // Group outputs by product name
+                      const productSummary: Record<string, { quantity: number; revenue: number; profit: number }> = {};
+                      
+                      inventoryOutputs.forEach((output) => {
+                        if (!productSummary[output.name]) {
+                          productSummary[output.name] = { quantity: 0, revenue: 0, profit: 0 };
+                        }
+                        productSummary[output.name].quantity += output.quantity;
+                        productSummary[output.name].revenue += output.salePrice * output.quantity;
+                        productSummary[output.name].profit += output.profit;
+                      });
+
+                      const sortedProducts = Object.entries(productSummary).sort((a, b) => b[1].quantity - a[1].quantity);
+
+                      return (
+                        <>
+                          {sortedProducts.map(([name, data]) => (
+                            <TableRow key={name}>
+                              <TableCell className="font-medium">{name}</TableCell>
+                              <TableCell className="text-center font-bold">{data.quantity}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(data.revenue)}</TableCell>
+                              <TableCell className="text-right text-green-600 font-bold">
+                                {formatCurrency(data.profit)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow className="bg-purple-100/50 dark:bg-purple-900/20 font-bold">
+                            <TableCell>Total</TableCell>
+                            <TableCell className="text-center">
+                              {inventoryOutputs.reduce((sum, o) => sum + o.quantity, 0)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(inventoryOutputs.reduce((sum, o) => sum + o.salePrice * o.quantity, 0))}
+                            </TableCell>
+                            <TableCell className="text-right text-green-600">
+                              {formatCurrency(totalInventoryProfit)}
+                            </TableCell>
+                          </TableRow>
+                        </>
+                      );
+                    })()}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-center py-4 text-muted-foreground">No hay productos vendidos aún</p>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Summary Card */}
           <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
             <CardHeader>
