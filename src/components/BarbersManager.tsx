@@ -136,7 +136,7 @@ const BarbersManager = () => {
   if (loading) {
     return (
       <div className="space-y-6">
-        <h2 className="text-3xl font-bold">Gestión de Barberos</h2>
+        <h2 className="text-3xl font-bold">Gestión de Empleados</h2>
         <div className="text-center py-8">Cargando barberos...</div>
       </div>
     );
@@ -145,7 +145,7 @@ const BarbersManager = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold">Gestión de Barberos</h2>
+        <h2 className="text-3xl font-bold">Gestión de Empleados</h2>
         <Button onClick={() => setIsAddingBarber(true)} variant="outline">
           <Plus className="h-4 w-4 mr-2" />
           Agregar Barbero
@@ -183,7 +183,7 @@ const BarbersManager = () => {
       {isAddingBarber && (
         <Card className="border-0 shadow-lg">
           <CardHeader>
-            <CardTitle>Agregar Nuevo Barbero</CardTitle>
+            <CardTitle>Agregar Nuevo Empleado</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
