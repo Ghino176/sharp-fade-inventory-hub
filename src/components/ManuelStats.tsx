@@ -17,7 +17,7 @@ interface DailyService {
 
 // Manuel's earning rates per service
 const manuelEarnings: Record<string, number> = {
-  "Corte": 3,
+  "Corte": 3.5,
   "Barba Sencilla": 1,
   "Barba Premium": 2,
   "Cejas": 0.5,
