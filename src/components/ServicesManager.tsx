@@ -37,14 +37,12 @@ const ServicesManager = () => {
   });
 
   const serviceTypes = [
-    { name: "Corte", label: "Corte", price: 7, earning: 4 },
+    { name: "Corte", label: "Corte", price: 8, earning: 4.5 },
     { name: "Barba Sencilla", label: "Barba Sencilla", price: 2, earning: 1 },
     { name: "Barba Premium", label: "Barba Premium", price: 4, earning: 2 },
     { name: "Cejas", label: "Cejas", price: 1, earning: 0.5 },
-    { name: "Afeitado", label: "Afeitado", price: 2, earning: 1 },
     { name: "Facial Primera Vez", label: "Facial Primera Vez", price: 7, earning: 4 },
     { name: "Facial", label: "Facial", price: 8, earning: 5 },
-    { name: "Corte+Barba Premium", label: "Corte+Barba Premium", price: 10, earning: 6 },
     { name: "Mascarilla Completa", label: "Mascarilla Completa", price: 1, earning: 0.5 },
   ];
 
