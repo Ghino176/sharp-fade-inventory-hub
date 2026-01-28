@@ -19,7 +19,7 @@ const Header = ({ activeSection, onSectionChange, userName, userRole }: HeaderPr
     { id: "dashboard", label: "Dashboard" },
     { id: "services", label: "Services" },
     { id: "inventory", label: "Inventory" },
-    { id: "barbers", label: "Barberos" },
+    { id: "barbers", label: "Employees" },
     { id: "weekly-stats", label: "Stats" },
     { id: "data-manager", label: "Management" },
   ];
