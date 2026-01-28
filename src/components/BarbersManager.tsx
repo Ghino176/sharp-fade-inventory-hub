@@ -48,7 +48,7 @@ const BarbersManager = () => {
       console.error('Error fetching barbers:', error);
       toast({
         title: "Error",
-        description: "No se pudieron cargar los barberos",
+        description: "No se pudieron cargar los Empleados",
         variant: "destructive",
       });
     } finally {
@@ -60,7 +60,7 @@ const BarbersManager = () => {
     if (!newBarber.name) {
       toast({
         title: "Error",
-        description: "Por favor ingresa el nombre del barbero",
+        description: "Por favor ingresa el nombre del Empleado",
         variant: "destructive",
       });
       return;
@@ -117,14 +117,14 @@ const BarbersManager = () => {
       setBarbers(prev => prev.filter(barber => barber.id !== barberId));
 
       toast({
-        title: "Barbero eliminado",
+        title: "Empleado eliminado",
         description: `${barberName} y todos sus datos han sido eliminados`,
       });
     } catch (error) {
       console.error('Error deleting barber:', error);
       toast({
         title: "Error",
-        description: "No se pudo eliminar el barbero",
+        description: "No se pudo eliminar el Empleado",
         variant: "destructive",
       });
     }
@@ -137,7 +137,7 @@ const BarbersManager = () => {
     return (
       <div className="space-y-6">
         <h2 className="text-3xl font-bold">Gestión de Empleados</h2>
-        <div className="text-center py-8">Cargando barberos...</div>
+        <div className="text-center py-8">Cargando Empleado...</div>
       </div>
     );
   }
@@ -160,7 +160,7 @@ const BarbersManager = () => {
               <Users className="h-8 w-8 text-barbershop-silver" />
               <div>
                 <p className="text-2xl font-bold">{barbers.length}</p>
-                <p className="text-sm text-muted-foreground">Barberos</p>
+                <p className="text-sm text-muted-foreground">Empleados</p>
               </div>
             </div>
           </CardContent>
@@ -265,7 +265,7 @@ const BarbersManager = () => {
                     onClick={() => handleDeleteBarber(barber.id, barber.name)}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
-                    Eliminar Barbero
+                    Eliminar Empleado
                   </Button>
                 </div>
               </div>
@@ -275,7 +275,7 @@ const BarbersManager = () => {
 
         {barbers.length === 0 && (
           <div className="col-span-full text-center py-8 text-muted-foreground">
-            No hay barberos registrados
+            No hay Empleados registrados
           </div>
         )}
       </div>
