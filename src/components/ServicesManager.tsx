@@ -40,11 +40,10 @@ const ServicesManager = () => {
     { name: "Corte", label: "Corte", earning: 4.6 },
     { name: "Barba Sencilla", label: "Barba Sencilla", earning: 1 },
     { name: "Barba Premium", label: "Barba Premium", earning: 2 },
-    { name: "Cejas", label: "Cejas", earning: 0.5 },
     { name: "Afeitado", label: "Afeitado", earning: 1 },
     { name: "Facial Primera Vez", label: "Facial Primera Vez", earning: 4 },
     { name: "Facial", label: "Facial", earning: 5 },
-    { name: "Corte+Barba Premium", label: "Corte+Barba Premium", earning: 6.5 },
+    { name: "Corte+Barba Premium", label: "Corte+Barba Premium", earning: 6.6 },
     { name: "Mascarilla Completa", label: "Mascarilla Completa", earning: 0.5 },
   ];
 
