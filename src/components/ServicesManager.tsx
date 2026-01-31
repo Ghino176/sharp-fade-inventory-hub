@@ -34,7 +34,15 @@ const ServicesManager = () => {
     service_type: "",
     barber_earning: "",
     tip: "",
+    payment_method: "efectivo",
   });
+
+  const paymentMethods = [
+    { value: "efectivo", label: "Efectivo" },
+    { value: "pago movil", label: "Pago Móvil" },
+    { value: "transferencia", label: "Transferencia" },
+    { value: "zelle", label: "Zelle" },
+  ];
 
   const serviceTypes = [
     { name: "Corte", label: "Corte", earning: 4.6 },
@@ -135,6 +143,7 @@ const ServicesManager = () => {
         service_type: newService.service_type,
         price: 0, // No longer used but required by schema
         barber_earning: totalEarning,
+        payment_method: newService.payment_method,
       };
 
       const { data, error } = await supabase
@@ -184,6 +193,7 @@ const ServicesManager = () => {
         service_type: "",
         barber_earning: "",
         tip: "",
+        payment_method: "efectivo",
       });
 
       toast({
@@ -289,6 +299,25 @@ const ServicesManager = () => {
                   {serviceTypes.map((service) => (
                     <SelectItem key={service.name} value={service.name}>
                       {service.label} (${service.earning})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="payment_method">Método de Pago</Label>
+              <Select 
+                value={newService.payment_method} 
+                onValueChange={(value) => setNewService(prev => ({ ...prev, payment_method: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar método" />
+                </SelectTrigger>
+                <SelectContent>
+                  {paymentMethods.map((method) => (
+                    <SelectItem key={method.value} value={method.value}>
+                      {method.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

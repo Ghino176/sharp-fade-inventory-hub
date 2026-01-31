@@ -5,45 +5,27 @@ import { Scissors, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { startOfWeek, endOfWeek, format, addDays, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
+import { startOfWeek, endOfWeek, format, parseISO } from "date-fns";
 import WeekSelector from "./WeekSelector";
 
-// All service types offered
-const allServiceTypes = [
-  "Corte",
-  "Barba Sencilla",
-  "Barba Premium",
-  "Cejas",
-  "Afeitado",
-  "Facial Primera Vez",
-  "Facial",
-  "Corte+Barba Premium",
-  "Mascarilla Completa",
-];
-
-interface DailyServiceCounts {
-  [key: string]: number;
-}
-
-interface DailyService {
-  day: string;
-  dayName: string;
-  serviceCounts: DailyServiceCounts;
-  ganancias: number;
+interface ServiceRecord {
+  id: string;
+  service_type: string;
+  barber_earning: number;
+  payment_method: string | null;
+  created_at: string;
 }
 
 const UserStats = () => {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [dailyServices, setDailyServices] = useState<DailyService[]>([]);
-  const [weeklyServiceCounts, setWeeklyServiceCounts] = useState<DailyServiceCounts>({});
+  const [services, setServices] = useState<ServiceRecord[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [barberName, setBarberName] = useState<string | null>(null);
   const [barberId, setBarberId] = useState<string | null>(null);
   const [noBarberLinked, setNoBarberLinked] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [totalGanancias, setTotalGanancias] = useState(0);
+  const [totalEarnings, setTotalEarnings] = useState(0);
 
   useEffect(() => {
     if (user) {
@@ -59,7 +41,6 @@ const UserStats = () => {
 
   const fetchBarberInfo = async () => {
     try {
-      // Get the barber linked to this user
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("barber_id")
@@ -72,7 +53,6 @@ const UserStats = () => {
         return;
       }
 
-      // Get barber name
       const { data: barberData } = await supabase
         .from("barbers")
         .select("name")
@@ -92,64 +72,34 @@ const UserStats = () => {
 
   const fetchUserStats = async () => {
     if (!barberId) return;
-    
+
     setLoading(true);
     try {
       const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
       const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
 
-      // Fetch services for this barber in selected week with barber_earning
-      const { data: services, error: servicesError } = await supabase
+      const { data: servicesData, error: servicesError } = await supabase
         .from("services")
-        .select("service_type, created_at, barber_earning")
+        .select("id, service_type, created_at, barber_earning, payment_method")
         .eq("barber_id", barberId)
         .gte("created_at", weekStart.toISOString())
-        .lte("created_at", weekEnd.toISOString());
+        .lte("created_at", weekEnd.toISOString())
+        .order("created_at", { ascending: false });
 
       if (servicesError) throw servicesError;
 
-      // Process daily stats (Mon-Sat)
-      const stats: DailyService[] = [];
-      let weekTotal = 0;
-      const weekCounts: DailyServiceCounts = {};
-      
-      // Initialize weekly counts
-      allServiceTypes.forEach(type => {
-        weekCounts[type] = 0;
-      });
-      
-      for (let i = 0; i < 6; i++) {
-        const day = addDays(weekStart, i);
-        const dayStr = format(day, "yyyy-MM-dd");
-        const dayName = format(day, "EEEE", { locale: es });
-        
-        const dayServices = (services || []).filter((s) => {
-          const serviceDate = format(parseISO(s.created_at), "yyyy-MM-dd");
-          return serviceDate === dayStr;
-        });
+      const formattedServices: ServiceRecord[] = (servicesData || []).map((s) => ({
+        id: s.id,
+        service_type: s.service_type,
+        barber_earning: Number(s.barber_earning || 0),
+        payment_method: s.payment_method,
+        created_at: s.created_at,
+      }));
 
-        const dayGanancias = dayServices.reduce((sum, s) => sum + Number(s.barber_earning || 0), 0);
-        weekTotal += dayGanancias;
+      const total = formattedServices.reduce((sum, s) => sum + s.barber_earning, 0);
 
-        // Count each service type
-        const serviceCounts: DailyServiceCounts = {};
-        allServiceTypes.forEach(type => {
-          const count = dayServices.filter((s) => s.service_type === type).length;
-          serviceCounts[type] = count;
-          weekCounts[type] += count;
-        });
-
-        stats.push({
-          day: dayStr,
-          dayName: dayName.charAt(0).toUpperCase() + dayName.slice(1),
-          serviceCounts,
-          ganancias: dayGanancias,
-        });
-      }
-
-      setDailyServices(stats);
-      setWeeklyServiceCounts(weekCounts);
-      setTotalGanancias(weekTotal);
+      setServices(formattedServices);
+      setTotalEarnings(total);
     } catch (error) {
       console.error("Error fetching user stats:", error);
       toast({
@@ -163,10 +113,15 @@ const UserStats = () => {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("es-MX", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
+    return `${amount.toFixed(2)}$`;
+  };
+
+  const formatDate = (dateStr: string) => {
+    return format(parseISO(dateStr), "dd/MM/yyyy");
+  };
+
+  const formatTime = (dateStr: string) => {
+    return format(parseISO(dateStr), "h:mm a");
   };
 
   if (noBarberLinked) {
@@ -207,58 +162,49 @@ const UserStats = () => {
               </CardTitle>
               <div className="flex items-center gap-2 text-lg font-bold text-green-600">
                 <DollarSign className="h-5 w-5" />
-                {formatCurrency(totalGanancias)}
+                {formatCurrency(totalEarnings)}
               </div>
             </div>
           </CardHeader>
           <CardContent className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[100px]">Día</TableHead>
-                  {allServiceTypes.map((type) => (
-                    <TableHead key={type} className="text-center min-w-[80px] text-xs">
-                      {type}
-                    </TableHead>
-                  ))}
-                  <TableHead className="text-center">Total</TableHead>
-                  <TableHead className="text-right">Ganancias</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dailyServices.map((day) => {
-                  const dayTotal = Object.values(day.serviceCounts).reduce((a, b) => a + b, 0);
-                  return (
-                    <TableRow key={day.day}>
-                      <TableCell className="font-medium">{day.dayName}</TableCell>
-                      {allServiceTypes.map((type) => (
-                        <TableCell key={type} className="text-center">
-                          {day.serviceCounts[type] || 0}
-                        </TableCell>
-                      ))}
-                      <TableCell className="text-center font-bold">{dayTotal}</TableCell>
-                      <TableCell className="text-right text-green-600 font-medium">
-                        {formatCurrency(day.ganancias)}
+            {services.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Hora</TableHead>
+                    <TableHead>Servicio</TableHead>
+                    <TableHead>Método de Pago</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {services.map((service) => (
+                    <TableRow key={service.id}>
+                      <TableCell>{formatDate(service.created_at)}</TableCell>
+                      <TableCell>{formatTime(service.created_at)}</TableCell>
+                      <TableCell>{service.service_type}</TableCell>
+                      <TableCell>{service.payment_method || "efectivo"}</TableCell>
+                      <TableCell>{barberName}</TableCell>
+                      <TableCell className="text-right font-medium text-green-600">
+                        {formatCurrency(service.barber_earning)}
                       </TableCell>
                     </TableRow>
-                  );
-                })}
-                <TableRow className="bg-muted/50 font-bold">
-                  <TableCell>Total Semana</TableCell>
-                  {allServiceTypes.map((type) => (
-                    <TableCell key={type} className="text-center">
-                      {weeklyServiceCounts[type] || 0}
-                    </TableCell>
                   ))}
-                  <TableCell className="text-center">
-                    {Object.values(weeklyServiceCounts).reduce((a, b) => a + b, 0)}
-                  </TableCell>
-                  <TableCell className="text-right text-green-600">
-                    {formatCurrency(totalGanancias)}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+                  <TableRow className="bg-muted/50 font-bold">
+                    <TableCell colSpan={5}>Total</TableCell>
+                    <TableCell className="text-right text-green-600">
+                      {formatCurrency(totalEarnings)}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-center py-4 text-muted-foreground">
+                No hay servicios registrados esta semana
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
