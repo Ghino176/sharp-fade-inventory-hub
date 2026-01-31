@@ -124,6 +124,7 @@ export type Database = {
           barber_id: string
           created_at: string
           id: string
+          payment_method: string | null
           price: number
           service_type: string
         }
@@ -132,6 +133,7 @@ export type Database = {
           barber_id: string
           created_at?: string
           id?: string
+          payment_method?: string | null
           price: number
           service_type: string
         }
@@ -140,6 +142,7 @@ export type Database = {
           barber_id?: string
           created_at?: string
           id?: string
+          payment_method?: string | null
           price?: number
           service_type?: string
         }

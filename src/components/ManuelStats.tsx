@@ -1,38 +1,22 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Crown, DollarSign, Package, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
+import { Crown, DollarSign, Package, ArrowDownCircle, ArrowUpCircle, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { startOfWeek, endOfWeek, format, addDays, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
+import { startOfWeek, endOfWeek, format, parseISO } from "date-fns";
 import WeekSelector from "./WeekSelector";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
-// All service types offered
-const allServiceTypes = [
-  "Corte",
-  "Barba Sencilla",
-  "Barba Premium",
-  "Cejas",
-  "Afeitado",
-  "Facial Primera Vez",
-  "Facial",
-  "Corte+Barba Premium",
-  "Mascarilla Completa",
-];
-
-interface DailyServiceCounts {
-  [key: string]: number;
-}
-
-interface DailyService {
-  day: string;
-  dayName: string;
-  serviceCounts: DailyServiceCounts;
-  ganancias: number;
+interface ServiceRecord {
+  id: string;
+  service_type: string;
+  barber_earning: number;
+  payment_method: string | null;
+  created_at: string;
+  barber_name: string;
 }
 
 interface InventoryEntry {
@@ -68,17 +52,15 @@ const manuelEarnings: Record<string, number> = {
 
 const ManuelStats = () => {
   const { toast } = useToast();
-  const [dailyServices, setDailyServices] = useState<DailyService[]>([]);
-  const [weeklyServiceCounts, setWeeklyServiceCounts] = useState<DailyServiceCounts>({});
+  const [services, setServices] = useState<ServiceRecord[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [totalGanancias, setTotalGanancias] = useState(0);
-  const [totalServices, setTotalServices] = useState(0);
-  
-  // Inventory state (local for now)
+
+  // Inventory state
   const [inventoryEntries, setInventoryEntries] = useState<InventoryEntry[]>([]);
   const [inventoryOutputs, setInventoryOutputs] = useState<InventoryOutput[]>([]);
-  
+
   // Forms for new entries
   const [newEntry, setNewEntry] = useState({ name: "", quantity: "", cost: "" });
   const [newOutput, setNewOutput] = useState({ name: "", quantity: "", salePrice: "", cost: "" });
@@ -93,62 +75,36 @@ const ManuelStats = () => {
       const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
       const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
 
-      // Fetch all services from selected week
-      const { data: services, error: servicesError } = await supabase
+      // Fetch all services with barber info
+      const { data: servicesData, error: servicesError } = await supabase
         .from("services")
-        .select("service_type, created_at")
+        .select(`
+          id, 
+          service_type, 
+          created_at, 
+          payment_method,
+          barbers(name)
+        `)
         .gte("created_at", weekStart.toISOString())
-        .lte("created_at", weekEnd.toISOString());
+        .lte("created_at", weekEnd.toISOString())
+        .order("created_at", { ascending: false });
 
       if (servicesError) throw servicesError;
 
-      // Process daily stats (Mon-Sat)
-      const stats: DailyService[] = [];
-      let weekTotal = 0;
-      let weekServices = 0;
-      const weekCounts: DailyServiceCounts = {};
-      
-      // Initialize weekly counts
-      allServiceTypes.forEach(type => {
-        weekCounts[type] = 0;
-      });
+      // Calculate Manuel's earnings for each service
+      const formattedServices: ServiceRecord[] = (servicesData || []).map((s: any) => ({
+        id: s.id,
+        service_type: s.service_type,
+        barber_earning: manuelEarnings[s.service_type] || 0,
+        payment_method: s.payment_method,
+        created_at: s.created_at,
+        barber_name: s.barbers?.name || "Sin barbero",
+      }));
 
-      for (let i = 0; i < 6; i++) {
-        const day = addDays(weekStart, i);
-        const dayStr = format(day, "yyyy-MM-dd");
-        const dayName = format(day, "EEEE", { locale: es });
+      const total = formattedServices.reduce((sum, s) => sum + s.barber_earning, 0);
 
-        const dayServices = (services || []).filter((s) => {
-          const serviceDate = format(parseISO(s.created_at), "yyyy-MM-dd");
-          return serviceDate === dayStr;
-        });
-
-        // Calculate Manuel's earnings based on his rates
-        let dayGanancias = 0;
-        const serviceCounts: DailyServiceCounts = {};
-
-        allServiceTypes.forEach(type => {
-          const count = dayServices.filter((s) => s.service_type === type).length;
-          serviceCounts[type] = count;
-          weekCounts[type] += count;
-          dayGanancias += count * (manuelEarnings[type] || 0);
-        });
-
-        weekTotal += dayGanancias;
-        weekServices += dayServices.length;
-
-        stats.push({
-          day: dayStr,
-          dayName: dayName.charAt(0).toUpperCase() + dayName.slice(1),
-          serviceCounts,
-          ganancias: dayGanancias,
-        });
-      }
-
-      setDailyServices(stats);
-      setWeeklyServiceCounts(weekCounts);
-      setTotalGanancias(weekTotal);
-      setTotalServices(weekServices);
+      setServices(formattedServices);
+      setTotalGanancias(total);
     } catch (error) {
       console.error("Error fetching Manuel stats:", error);
       toast({
@@ -162,10 +118,15 @@ const ManuelStats = () => {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("es-MX", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
+    return `${amount.toFixed(2)}$`;
+  };
+
+  const formatDate = (dateStr: string) => {
+    return format(parseISO(dateStr), "dd/MM/yyyy");
+  };
+
+  const formatTime = (dateStr: string) => {
+    return format(parseISO(dateStr), "h:mm a");
   };
 
   const handleAddEntry = () => {
@@ -173,7 +134,7 @@ const ManuelStats = () => {
       toast({ title: "Error", description: "Completa todos los campos", variant: "destructive" });
       return;
     }
-    
+
     const entry: InventoryEntry = {
       id: Date.now().toString(),
       name: newEntry.name,
@@ -181,8 +142,8 @@ const ManuelStats = () => {
       cost: parseFloat(newEntry.cost),
       date: new Date().toISOString(),
     };
-    
-    setInventoryEntries(prev => [entry, ...prev]);
+
+    setInventoryEntries((prev) => [entry, ...prev]);
     setNewEntry({ name: "", quantity: "", cost: "" });
     toast({ title: "Entrada registrada", description: `${entry.name} agregado al inventario` });
   };
@@ -192,12 +153,12 @@ const ManuelStats = () => {
       toast({ title: "Error", description: "Completa todos los campos", variant: "destructive" });
       return;
     }
-    
+
     const quantity = parseInt(newOutput.quantity);
     const salePrice = parseFloat(newOutput.salePrice);
     const cost = parseFloat(newOutput.cost);
     const profit = (salePrice - cost) * quantity;
-    
+
     const output: InventoryOutput = {
       id: Date.now().toString(),
       name: newOutput.name,
@@ -207,14 +168,34 @@ const ManuelStats = () => {
       profit,
       date: new Date().toISOString(),
     };
-    
-    setInventoryOutputs(prev => [output, ...prev]);
+
+    setInventoryOutputs((prev) => [output, ...prev]);
     setNewOutput({ name: "", quantity: "", salePrice: "", cost: "" });
     toast({ title: "Salida registrada", description: `${output.name} - Ganancia: ${formatCurrency(profit)}` });
   };
 
   const totalInventoryProfit = inventoryOutputs.reduce((sum, o) => sum + o.profit, 0);
-  const totalInventoryCost = inventoryEntries.reduce((sum, e) => sum + (e.cost * e.quantity), 0);
+  const totalInventoryCost = inventoryEntries.reduce((sum, e) => sum + e.cost * e.quantity, 0);
+
+  // Product sales summary
+  const productSalesSummary = inventoryOutputs.reduce((acc, output) => {
+    if (!acc[output.name]) {
+      acc[output.name] = { quantity: 0, revenue: 0, profit: 0 };
+    }
+    acc[output.name].quantity += output.quantity;
+    acc[output.name].revenue += output.salePrice * output.quantity;
+    acc[output.name].profit += output.profit;
+    return acc;
+  }, {} as Record<string, { quantity: number; revenue: number; profit: number }>);
+
+  const productSalesArray = Object.entries(productSalesSummary).map(([name, data]) => ({
+    name,
+    ...data,
+  }));
+
+  const totalSalesQuantity = productSalesArray.reduce((sum, p) => sum + p.quantity, 0);
+  const totalSalesRevenue = productSalesArray.reduce((sum, p) => sum + p.revenue, 0);
+  const totalSalesProfit = productSalesArray.reduce((sum, p) => sum + p.profit, 0);
 
   return (
     <div className="space-y-6">
@@ -249,51 +230,44 @@ const ManuelStats = () => {
               </div>
             </CardHeader>
             <CardContent className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[100px]">Día</TableHead>
-                    {allServiceTypes.map((type) => (
-                      <TableHead key={type} className="text-center min-w-[70px] text-xs">
-                        {type}
-                      </TableHead>
-                    ))}
-                    <TableHead className="text-center">Total</TableHead>
-                    <TableHead className="text-right">Ganancias</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dailyServices.map((day) => {
-                    const dayTotal = Object.values(day.serviceCounts).reduce((a, b) => a + b, 0);
-                    return (
-                      <TableRow key={day.day}>
-                        <TableCell className="font-medium">{day.dayName}</TableCell>
-                        {allServiceTypes.map((type) => (
-                          <TableCell key={type} className="text-center">
-                            {day.serviceCounts[type] || 0}
-                          </TableCell>
-                        ))}
-                        <TableCell className="text-center font-bold">{dayTotal}</TableCell>
-                        <TableCell className="text-right text-yellow-600 font-medium">
-                          {formatCurrency(day.ganancias)}
+              {services.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Hora</TableHead>
+                      <TableHead>Servicio</TableHead>
+                      <TableHead>Método de Pago</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {services.map((service) => (
+                      <TableRow key={service.id}>
+                        <TableCell>{formatDate(service.created_at)}</TableCell>
+                        <TableCell>{formatTime(service.created_at)}</TableCell>
+                        <TableCell>{service.service_type}</TableCell>
+                        <TableCell>{service.payment_method || "efectivo"}</TableCell>
+                        <TableCell>{service.barber_name}</TableCell>
+                        <TableCell className="text-right font-medium text-yellow-600">
+                          {formatCurrency(service.barber_earning)}
                         </TableCell>
                       </TableRow>
-                    );
-                  })}
-                  <TableRow className="bg-yellow-100/50 dark:bg-yellow-900/20 font-bold">
-                    <TableCell>Total Semana</TableCell>
-                    {allServiceTypes.map((type) => (
-                      <TableCell key={type} className="text-center">
-                        {weeklyServiceCounts[type] || 0}
-                      </TableCell>
                     ))}
-                    <TableCell className="text-center">{totalServices}</TableCell>
-                    <TableCell className="text-right text-yellow-600">
-                      {formatCurrency(totalGanancias)}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+                    <TableRow className="bg-yellow-100/50 dark:bg-yellow-900/20 font-bold">
+                      <TableCell colSpan={5}>Total</TableCell>
+                      <TableCell className="text-right text-yellow-600">
+                        {formatCurrency(totalGanancias)}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-center py-4 text-muted-foreground">
+                  No hay servicios registrados esta semana
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -311,7 +285,7 @@ const ManuelStats = () => {
                   <Label>Producto</Label>
                   <Input
                     value={newEntry.name}
-                    onChange={(e) => setNewEntry(prev => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) => setNewEntry((prev) => ({ ...prev, name: e.target.value }))}
                     placeholder="Nombre del producto"
                   />
                 </div>
@@ -320,7 +294,7 @@ const ManuelStats = () => {
                   <Input
                     type="number"
                     value={newEntry.quantity}
-                    onChange={(e) => setNewEntry(prev => ({ ...prev, quantity: e.target.value }))}
+                    onChange={(e) => setNewEntry((prev) => ({ ...prev, quantity: e.target.value }))}
                     placeholder="0"
                   />
                 </div>
@@ -330,7 +304,7 @@ const ManuelStats = () => {
                     type="number"
                     step="0.01"
                     value={newEntry.cost}
-                    onChange={(e) => setNewEntry(prev => ({ ...prev, cost: e.target.value }))}
+                    onChange={(e) => setNewEntry((prev) => ({ ...prev, cost: e.target.value }))}
                     placeholder="0.00"
                   />
                 </div>
@@ -341,7 +315,7 @@ const ManuelStats = () => {
                   </Button>
                 </div>
               </div>
-              
+
               {inventoryEntries.length > 0 && (
                 <Table>
                   <TableHeader>
@@ -374,7 +348,7 @@ const ManuelStats = () => {
                   </TableBody>
                 </Table>
               )}
-              
+
               {inventoryEntries.length === 0 && (
                 <p className="text-center py-4 text-muted-foreground">No hay entradas registradas</p>
               )}
@@ -395,7 +369,7 @@ const ManuelStats = () => {
                   <Label>Producto</Label>
                   <Input
                     value={newOutput.name}
-                    onChange={(e) => setNewOutput(prev => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) => setNewOutput((prev) => ({ ...prev, name: e.target.value }))}
                     placeholder="Nombre del producto"
                   />
                 </div>
@@ -404,7 +378,7 @@ const ManuelStats = () => {
                   <Input
                     type="number"
                     value={newOutput.quantity}
-                    onChange={(e) => setNewOutput(prev => ({ ...prev, quantity: e.target.value }))}
+                    onChange={(e) => setNewOutput((prev) => ({ ...prev, quantity: e.target.value }))}
                     placeholder="0"
                   />
                 </div>
@@ -414,7 +388,7 @@ const ManuelStats = () => {
                     type="number"
                     step="0.01"
                     value={newOutput.cost}
-                    onChange={(e) => setNewOutput(prev => ({ ...prev, cost: e.target.value }))}
+                    onChange={(e) => setNewOutput((prev) => ({ ...prev, cost: e.target.value }))}
                     placeholder="0.00"
                   />
                 </div>
@@ -424,7 +398,7 @@ const ManuelStats = () => {
                     type="number"
                     step="0.01"
                     value={newOutput.salePrice}
-                    onChange={(e) => setNewOutput(prev => ({ ...prev, salePrice: e.target.value }))}
+                    onChange={(e) => setNewOutput((prev) => ({ ...prev, salePrice: e.target.value }))}
                     placeholder="0.00"
                   />
                 </div>
@@ -435,7 +409,7 @@ const ManuelStats = () => {
                   </Button>
                 </div>
               </div>
-              
+
               {inventoryOutputs.length > 0 && (
                 <Table>
                   <TableHeader>
@@ -456,13 +430,13 @@ const ManuelStats = () => {
                         <TableCell className="text-center">{output.quantity}</TableCell>
                         <TableCell className="text-right">{formatCurrency(output.cost)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(output.salePrice)}</TableCell>
-                        <TableCell className="text-right text-green-600 font-bold">
+                        <TableCell className="text-right text-green-600 font-medium">
                           {formatCurrency(output.profit)}
                         </TableCell>
                       </TableRow>
                     ))}
-                    <TableRow className="bg-green-100/50 dark:bg-green-900/20 font-bold">
-                      <TableCell colSpan={5}>Total Ganancias Inventario</TableCell>
+                    <TableRow className="bg-muted/50 font-bold">
+                      <TableCell colSpan={5}>Total Ganancia Inventario</TableCell>
                       <TableCell className="text-right text-green-600">
                         {formatCurrency(totalInventoryProfit)}
                       </TableCell>
@@ -470,79 +444,55 @@ const ManuelStats = () => {
                   </TableBody>
                 </Table>
               )}
-              
+
               {inventoryOutputs.length === 0 && (
-                <p className="text-center py-4 text-muted-foreground">No hay ventas registradas</p>
+                <p className="text-center py-4 text-muted-foreground">No hay salidas registradas</p>
               )}
             </CardContent>
           </Card>
 
-          {/* Product Sales Count Card */}
+          {/* Product Sales Summary Card */}
           <Card className="border-0 shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <Package className="h-5 w-5 text-purple-500" />
+                <ShoppingCart className="h-5 w-5 text-purple-500" />
                 <span>Conteo de Productos Vendidos</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {inventoryOutputs.length > 0 ? (
+              {productSalesArray.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Producto</TableHead>
                       <TableHead className="text-center">Unidades Vendidas</TableHead>
-                      <TableHead className="text-right">Ingresos Totales</TableHead>
-                      <TableHead className="text-right">Ganancia Total</TableHead>
+                      <TableHead className="text-right">Ingresos</TableHead>
+                      <TableHead className="text-right">Ganancia</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(() => {
-                      // Group outputs by product name
-                      const productSummary: Record<string, { quantity: number; revenue: number; profit: number }> = {};
-                      
-                      inventoryOutputs.forEach((output) => {
-                        if (!productSummary[output.name]) {
-                          productSummary[output.name] = { quantity: 0, revenue: 0, profit: 0 };
-                        }
-                        productSummary[output.name].quantity += output.quantity;
-                        productSummary[output.name].revenue += output.salePrice * output.quantity;
-                        productSummary[output.name].profit += output.profit;
-                      });
-
-                      const sortedProducts = Object.entries(productSummary).sort((a, b) => b[1].quantity - a[1].quantity);
-
-                      return (
-                        <>
-                          {sortedProducts.map(([name, data]) => (
-                            <TableRow key={name}>
-                              <TableCell className="font-medium">{name}</TableCell>
-                              <TableCell className="text-center font-bold">{data.quantity}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(data.revenue)}</TableCell>
-                              <TableCell className="text-right text-green-600 font-bold">
-                                {formatCurrency(data.profit)}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                          <TableRow className="bg-purple-100/50 dark:bg-purple-900/20 font-bold">
-                            <TableCell>Total</TableCell>
-                            <TableCell className="text-center">
-                              {inventoryOutputs.reduce((sum, o) => sum + o.quantity, 0)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {formatCurrency(inventoryOutputs.reduce((sum, o) => sum + o.salePrice * o.quantity, 0))}
-                            </TableCell>
-                            <TableCell className="text-right text-green-600">
-                              {formatCurrency(totalInventoryProfit)}
-                            </TableCell>
-                          </TableRow>
-                        </>
-                      );
-                    })()}
+                    {productSalesArray.map((product) => (
+                      <TableRow key={product.name}>
+                        <TableCell className="font-medium">{product.name}</TableCell>
+                        <TableCell className="text-center">{product.quantity}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(product.revenue)}</TableCell>
+                        <TableCell className="text-right text-green-600 font-medium">
+                          {formatCurrency(product.profit)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-muted/50 font-bold">
+                      <TableCell>Total</TableCell>
+                      <TableCell className="text-center">{totalSalesQuantity}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(totalSalesRevenue)}</TableCell>
+                      <TableCell className="text-right text-green-600">
+                        {formatCurrency(totalSalesProfit)}
+                      </TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               ) : (
-                <p className="text-center py-4 text-muted-foreground">No hay productos vendidos aún</p>
+                <p className="text-center py-4 text-muted-foreground">No hay productos vendidos</p>
               )}
             </CardContent>
           </Card>
@@ -551,23 +501,23 @@ const ManuelStats = () => {
           <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <Package className="h-5 w-5 text-green-500" />
-                <span>Resumen Total</span>
+                <Package className="h-5 w-5 text-green-600" />
+                <span>Resumen Total Manuel</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                <div className="text-center p-4 bg-background rounded-lg">
                   <p className="text-sm text-muted-foreground">Ganancias Servicios</p>
                   <p className="text-2xl font-bold text-yellow-600">{formatCurrency(totalGanancias)}</p>
                 </div>
-                <div className="p-4 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                <div className="text-center p-4 bg-background rounded-lg">
                   <p className="text-sm text-muted-foreground">Ganancias Inventario</p>
                   <p className="text-2xl font-bold text-green-600">{formatCurrency(totalInventoryProfit)}</p>
                 </div>
-                <div className="p-4 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                <div className="text-center p-4 bg-background rounded-lg">
                   <p className="text-sm text-muted-foreground">Total General</p>
-                  <p className="text-2xl font-bold text-emerald-600">
+                  <p className="text-2xl font-bold text-primary">
                     {formatCurrency(totalGanancias + totalInventoryProfit)}
                   </p>
                 </div>
