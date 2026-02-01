@@ -10,6 +10,7 @@ import AdminStats from "@/components/AdminStats";
 import UserStats from "@/components/UserStats";
 import ManuelStats from "@/components/ManuelStats";
 import DataManager from "@/components/DataManager";
+import BarberDeductions from "@/components/BarberDeductions";
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -44,6 +45,8 @@ const Index = () => {
         return <InventoryManager />;
       case "barbers":
         return <BarbersManager />;
+      case "deductions":
+        return userRole === 'admin' ? <BarberDeductions /> : <Dashboard />;
       case "weekly-stats":
         return userRole === 'admin' ? <AdminStats /> : <UserStats />;
       case "manuel-stats":
