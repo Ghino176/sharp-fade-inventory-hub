@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      barber_deductions: {
+        Row: {
+          amount: number
+          barber_id: string
+          concept: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          amount: number
+          barber_id: string
+          concept: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          amount?: number
+          barber_id?: string
+          concept?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "barber_deductions_barber_id_fkey"
+            columns: ["barber_id"]
+            isOneToOne: false
+            referencedRelation: "barbers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       barbers: {
         Row: {
           beards_count: number
@@ -83,6 +115,53 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_sales: {
+        Row: {
+          created_at: string
+          customer_name: string | null
+          id: string
+          inventory_id: string | null
+          payment_method: string | null
+          product_name: string
+          profit: number
+          quantity: number
+          sale_price: number
+          unit_cost: number
+        }
+        Insert: {
+          created_at?: string
+          customer_name?: string | null
+          id?: string
+          inventory_id?: string | null
+          payment_method?: string | null
+          product_name: string
+          profit?: number
+          quantity?: number
+          sale_price?: number
+          unit_cost?: number
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string | null
+          id?: string
+          inventory_id?: string | null
+          payment_method?: string | null
+          product_name?: string
+          profit?: number
+          quantity?: number
+          sale_price?: number
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_sales_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           barber_id: string | null
@@ -123,8 +202,10 @@ export type Database = {
           barber_earning: number
           barber_id: string
           created_at: string
+          customer_name: string | null
           id: string
           payment_method: string | null
+          payment_photo_url: string | null
           price: number
           service_type: string
         }
@@ -132,8 +213,10 @@ export type Database = {
           barber_earning?: number
           barber_id: string
           created_at?: string
+          customer_name?: string | null
           id?: string
           payment_method?: string | null
+          payment_photo_url?: string | null
           price: number
           service_type: string
         }
@@ -141,8 +224,10 @@ export type Database = {
           barber_earning?: number
           barber_id?: string
           created_at?: string
+          customer_name?: string | null
           id?: string
           payment_method?: string | null
+          payment_photo_url?: string | null
           price?: number
           service_type?: string
         }

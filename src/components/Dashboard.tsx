@@ -7,7 +7,8 @@ interface Service {
   id: string;
   barber_id: string;
   service_type: string;
-  price: number;
+  barber_earning: number;
+  customer_name: string | null;
   created_at: string;
   barbers: { name: string } | null;
 }
@@ -25,10 +26,10 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       const today = new Date().toISOString().split('T')[0];
       
-      // Fetch today's services (using created_at since service_date doesn't exist)
+      // Fetch today's services
       const { data: todayServicesData } = await supabase
         .from('services')
-        .select('price, created_at')
+        .select('barber_earning, created_at')
         .gte('created_at', `${today}T00:00:00`)
         .lte('created_at', `${today}T23:59:59`);
       
@@ -46,7 +47,12 @@ const Dashboard = () => {
       const { data: services } = await supabase
         .from('services')
         .select(`
-          *,
+          id,
+          barber_id,
+          service_type,
+          barber_earning,
+          customer_name,
+          created_at,
           barbers (name)
         `)
         .order('created_at', { ascending: false })
@@ -56,7 +62,7 @@ const Dashboard = () => {
       const todayServices = todayServicesData?.length || 0;
       const totalBarbers = barbersData?.length || 0;
       const inventoryItems = inventoryData?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
-      const todayEarnings = todayServicesData?.reduce((sum, service) => sum + (Number(service.price) || 0), 0) || 0;
+      const todayEarnings = todayServicesData?.reduce((sum, service) => sum + (Number(service.barber_earning) || 0), 0) || 0;
       
       setStats({
         todayServices,
@@ -66,7 +72,7 @@ const Dashboard = () => {
       });
       
       if (services) {
-        setRecentServices(services);
+        setRecentServices(services as Service[]);
       }
     };
 
@@ -96,7 +102,7 @@ const Dashboard = () => {
       color: "text-orange-600"
     },
     {
-      title: "Ingresos Hoy",
+      title: "Ganancias Hoy",
       value: `$${stats.todayEarnings.toFixed(2)}`,
       icon: DollarSign,
       change: "+8%",
@@ -155,6 +161,11 @@ const Dashboard = () => {
                       <p className="text-sm text-muted-foreground">
                         Barbero: {service.barbers?.name || 'No asignado'}
                       </p>
+                      {service.customer_name && (
+                        <p className="text-sm text-muted-foreground">
+                          Cliente: {service.customer_name}
+                        </p>
+                      )}
                     </div>
                     <div className="text-sm">
                       <p className="text-muted-foreground">
@@ -164,7 +175,7 @@ const Dashboard = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-lg">${Number(service.price).toFixed(2)}</p>
+                  <p className="font-bold text-lg text-green-600">${Number(service.barber_earning).toFixed(2)}</p>
                 </div>
               </div>
             ))}

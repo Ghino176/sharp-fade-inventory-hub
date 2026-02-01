@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Scissors, DollarSign, Calendar, User, Trash2, Gift } from "lucide-react";
+import { Plus, Scissors, DollarSign, Calendar, User, Trash2, Gift, Camera, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Barber {
   id: string;
@@ -20,6 +21,9 @@ interface Service {
   price: number;
   barber_earning: number;
   created_at: string;
+  customer_name?: string | null;
+  payment_method?: string | null;
+  payment_photo_url?: string | null;
   barber?: Barber;
 }
 
@@ -28,6 +32,10 @@ const ServicesManager = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [viewImageUrl, setViewImageUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [newService, setNewService] = useState({
     barber_id: "",
@@ -35,6 +43,8 @@ const ServicesManager = () => {
     barber_earning: "",
     tip: "",
     payment_method: "efectivo",
+    customer_name: "",
+    payment_photo: null as File | null,
   });
 
   const paymentMethods = [
@@ -123,6 +133,41 @@ const ServicesManager = () => {
     }));
   };
 
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewService(prev => ({ ...prev, payment_photo: file }));
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPreviewImage(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadPaymentPhoto = async (file: File): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `payments/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('payment-photos')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('payment-photos')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      return null;
+    }
+  };
+
   const handleAddService = async () => {
     if (!newService.barber_id || !newService.service_type) {
       toast({
@@ -134,16 +179,24 @@ const ServicesManager = () => {
     }
 
     try {
+      setUploading(true);
       const baseEarning = parseFloat(newService.barber_earning || "0");
       const tip = parseFloat(newService.tip || "0");
       const totalEarning = baseEarning + tip;
 
+      let paymentPhotoUrl: string | null = null;
+      if (newService.payment_photo && newService.payment_method === "pago movil") {
+        paymentPhotoUrl = await uploadPaymentPhoto(newService.payment_photo);
+      }
+
       const serviceData = {
         barber_id: newService.barber_id,
         service_type: newService.service_type,
-        price: 0, // No longer used but required by schema
+        price: 0,
         barber_earning: totalEarning,
         payment_method: newService.payment_method,
+        customer_name: newService.customer_name || null,
+        payment_photo_url: paymentPhotoUrl,
       };
 
       const { data, error } = await supabase
@@ -162,7 +215,6 @@ const ServicesManager = () => {
         : newService.service_type.toLowerCase().includes('barba') ? 'beards_count' 
         : 'eyebrows_count';
 
-      // Update barber count manually
       const { data: currentBarber } = await supabase
         .from('barbers')
         .select('cuts_count, beards_count, eyebrows_count')
@@ -194,7 +246,13 @@ const ServicesManager = () => {
         barber_earning: "",
         tip: "",
         payment_method: "efectivo",
+        customer_name: "",
+        payment_photo: null,
       });
+      setPreviewImage(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
 
       toast({
         title: "Servicio agregado",
@@ -207,6 +265,8 @@ const ServicesManager = () => {
         description: "No se pudo agregar el servicio",
         variant: "destructive",
       });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -306,6 +366,16 @@ const ServicesManager = () => {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="customer_name">Nombre del Cliente</Label>
+              <Input
+                id="customer_name"
+                value={newService.customer_name}
+                onChange={(e) => setNewService(prev => ({ ...prev, customer_name: e.target.value }))}
+                placeholder="Nombre del cliente"
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="payment_method">Método de Pago</Label>
               <Select 
                 value={newService.payment_method} 
@@ -339,6 +409,33 @@ const ServicesManager = () => {
                 placeholder="0.00"
               />
             </div>
+
+            {/* Payment Photo for Pago Móvil */}
+            {newService.payment_method === "pago movil" && (
+              <div className="space-y-2">
+                <Label htmlFor="payment_photo" className="flex items-center gap-1">
+                  <Camera className="h-4 w-4" />
+                  Foto del Pago
+                </Label>
+                <Input
+                  id="payment_photo"
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  onChange={handlePhotoChange}
+                  className="cursor-pointer"
+                />
+                {previewImage && (
+                  <div className="mt-2">
+                    <img 
+                      src={previewImage} 
+                      alt="Preview" 
+                      className="w-32 h-32 object-cover rounded-lg border"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           {newService.service_type && (
@@ -360,9 +457,9 @@ const ServicesManager = () => {
           )}
           
           <div className="mt-4">
-            <Button onClick={handleAddService} className="w-full md:w-auto">
+            <Button onClick={handleAddService} className="w-full md:w-auto" disabled={uploading}>
               <Plus className="h-4 w-4 mr-2" />
-              Agregar Servicio
+              {uploading ? "Subiendo..." : "Agregar Servicio"}
             </Button>
           </div>
         </CardContent>
@@ -383,22 +480,39 @@ const ServicesManager = () => {
                 key={service.id}
                 className="flex items-center justify-between p-4 rounded-lg bg-muted hover:bg-secondary transition-colors"
               >
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
                     <p className="font-medium flex items-center">
                       <User className="h-4 w-4 mr-1" />
-                      {service.barber?.name || 'Sin barbero'}
+                      {service.customer_name || 'Sin nombre'}
                     </p>
-                    <p className="text-sm text-muted-foreground">Barbero</p>
+                    <p className="text-sm text-muted-foreground">Cliente</p>
                   </div>
                   <div>
                     <p className="font-medium capitalize">{service.service_type}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Barbero: {service.barber?.name || 'Sin barbero'}
+                    </p>
+                  </div>
+                  <div>
                     <p className="text-sm text-muted-foreground flex items-center">
                       <Calendar className="h-4 w-4 mr-1" />
                       {new Date(service.created_at).toLocaleDateString()}
                     </p>
+                    <p className="text-sm text-muted-foreground capitalize">
+                      {service.payment_method || 'efectivo'}
+                    </p>
                   </div>
                   <div className="flex items-center justify-end space-x-2">
+                    {service.payment_photo_url && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setViewImageUrl(service.payment_photo_url!)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    )}
                     <p className="font-bold text-lg text-green-600">${service.barber_earning.toFixed(2)}</p>
                     <Button
                       variant="destructive"
@@ -420,6 +534,22 @@ const ServicesManager = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Image Preview Dialog */}
+      <Dialog open={!!viewImageUrl} onOpenChange={() => setViewImageUrl(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Comprobante de Pago</DialogTitle>
+          </DialogHeader>
+          {viewImageUrl && (
+            <img 
+              src={viewImageUrl} 
+              alt="Comprobante de pago" 
+              className="w-full h-auto rounded-lg"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
