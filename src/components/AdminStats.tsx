@@ -2,13 +2,13 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { User, DollarSign, FileSpreadsheet, FileText } from "lucide-react";
+import { User, DollarSign, FileSpreadsheet, FileText, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { startOfWeek, endOfWeek, format, parseISO } from "date-fns";
 import WeekSelector from "./WeekSelector";
 import { useExport } from "@/hooks/useExport";
-
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 interface ServiceRecord {
   id: string;
   barber_id: string;
@@ -17,6 +17,7 @@ interface ServiceRecord {
   service_type: string;
   barber_earning: number;
   payment_method: string | null;
+  payment_photo_url: string | null;
   created_at: string;
 }
 
@@ -43,6 +44,7 @@ const AdminStats = () => {
   const { exportToExcel, exportToPDF } = useExport();
   const [barberGroups, setBarberGroups] = useState<BarberGroup[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [viewImageUrl, setViewImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -65,7 +67,7 @@ const AdminStats = () => {
       // Fetch services from selected week
       const { data: services, error: servicesError } = await supabase
         .from("services")
-        .select("id, barber_id, service_type, created_at, barber_earning, payment_method, customer_name")
+        .select("id, barber_id, service_type, created_at, barber_earning, payment_method, customer_name, payment_photo_url")
         .gte("created_at", weekStart.toISOString())
         .lte("created_at", weekEnd.toISOString())
         .order("created_at", { ascending: false });
@@ -93,6 +95,7 @@ const AdminStats = () => {
             service_type: s.service_type,
             barber_earning: Number(s.barber_earning || 0),
             payment_method: s.payment_method,
+            payment_photo_url: s.payment_photo_url,
             created_at: s.created_at,
           }));
 
@@ -251,6 +254,7 @@ const AdminStats = () => {
                           <TableHead>Servicio</TableHead>
                           <TableHead>Método de Pago</TableHead>
                           <TableHead>Cliente</TableHead>
+                          <TableHead>Foto</TableHead>
                           <TableHead className="text-right">Total</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -262,13 +266,26 @@ const AdminStats = () => {
                             <TableCell>{service.service_type}</TableCell>
                             <TableCell className="capitalize">{service.payment_method || "efectivo"}</TableCell>
                             <TableCell>{service.customer_name || "-"}</TableCell>
+                            <TableCell>
+                              {service.payment_photo_url ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setViewImageUrl(service.payment_photo_url)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              ) : (
+                                "-"
+                              )}
+                            </TableCell>
                             <TableCell className="text-right font-medium text-green-600">
                               {formatCurrency(service.barber_earning)}
                             </TableCell>
                           </TableRow>
                         ))}
                         <TableRow className="bg-muted/50 font-bold">
-                          <TableCell colSpan={5}>Total Servicios</TableCell>
+                          <TableCell colSpan={6}>Total Servicios</TableCell>
                           <TableCell className="text-right text-green-600">
                             {formatCurrency(barber.totalEarnings)}
                           </TableCell>
@@ -276,7 +293,7 @@ const AdminStats = () => {
                         {barber.deductions.length > 0 && (
                           <>
                             <TableRow className="bg-destructive/10">
-                              <TableCell colSpan={6} className="font-bold text-destructive">
+                              <TableCell colSpan={7} className="font-bold text-destructive">
                                 Descuentos
                               </TableCell>
                             </TableRow>
@@ -284,14 +301,14 @@ const AdminStats = () => {
                               <TableRow key={d.id} className="bg-destructive/5">
                                 <TableCell>{formatDate(d.created_at)}</TableCell>
                                 <TableCell>{formatTime(d.created_at)}</TableCell>
-                                <TableCell colSpan={3}>{d.concept}</TableCell>
+                                <TableCell colSpan={4}>{d.concept}</TableCell>
                                 <TableCell className="text-right font-medium text-destructive">
                                   -{formatCurrency(d.amount)}
                                 </TableCell>
                               </TableRow>
                             ))}
                             <TableRow className="bg-destructive/10 font-bold">
-                              <TableCell colSpan={5}>Total Descuentos</TableCell>
+                              <TableCell colSpan={6}>Total Descuentos</TableCell>
                               <TableCell className="text-right text-destructive">
                                 -{formatCurrency(barber.totalDeductions)}
                               </TableCell>
@@ -299,7 +316,7 @@ const AdminStats = () => {
                           </>
                         )}
                         <TableRow className="bg-primary/10 font-bold text-lg">
-                          <TableCell colSpan={5}>TOTAL NETO</TableCell>
+                          <TableCell colSpan={6}>TOTAL NETO</TableCell>
                           <TableCell className="text-right text-primary">
                             {formatCurrency(barber.netEarnings)}
                           </TableCell>
@@ -325,6 +342,22 @@ const AdminStats = () => {
           )}
         </>
       )}
+
+      {/* Image Preview Dialog */}
+      <Dialog open={!!viewImageUrl} onOpenChange={() => setViewImageUrl(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Comprobante de Pago</DialogTitle>
+          </DialogHeader>
+          {viewImageUrl && (
+            <img 
+              src={viewImageUrl} 
+              alt="Comprobante de pago" 
+              className="w-full h-auto rounded-lg"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
