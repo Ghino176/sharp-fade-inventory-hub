@@ -46,7 +46,7 @@ const Index = () => {
       case "barbers":
         return <BarbersManager />;
       case "deductions":
-        return userRole === 'admin' ? <BarberDeductions /> : <Dashboard />;
+        return <BarberDeductions />;
       case "weekly-stats":
         return userRole === 'admin' ? <AdminStats /> : <UserStats />;
       case "manuel-stats":
