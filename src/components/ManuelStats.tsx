@@ -34,7 +34,7 @@ const manuelEarnings: Record<string, number> = {
   "Corte+Barba Premium": 4,
   "Corte+Barba Sencilla": 4.4,
   "Mascarilla Completa": 0.5,
-  "Promo Pana": 8,
+  "Promo Pana": 4,
 };
 
 const ManuelStats = () => {
