@@ -18,6 +18,7 @@ interface ServiceRecord {
   barber_earning: number;
   payment_method: string | null;
   payment_photo_url: string | null;
+  concept: string | null;
   created_at: string;
 }
 
@@ -67,7 +68,7 @@ const AdminStats = () => {
       // Fetch services from selected week
       const { data: services, error: servicesError } = await supabase
         .from("services")
-        .select("id, barber_id, service_type, created_at, barber_earning, payment_method, customer_name, payment_photo_url")
+        .select("id, barber_id, service_type, created_at, barber_earning, payment_method, customer_name, payment_photo_url, concept")
         .gte("created_at", weekStart.toISOString())
         .lte("created_at", weekEnd.toISOString())
         .order("created_at", { ascending: false });
@@ -96,6 +97,7 @@ const AdminStats = () => {
             barber_earning: Number(s.barber_earning || 0),
             payment_method: s.payment_method,
             payment_photo_url: s.payment_photo_url,
+            concept: s.concept,
             created_at: s.created_at,
           }));
 
@@ -154,13 +156,14 @@ const AdminStats = () => {
     
     const data = {
       title: `Estadísticas ${barber.barberName} - ${format(weekStart, 'dd/MM')} al ${format(weekEnd, 'dd/MM/yyyy')}`,
-      headers: ['Fecha', 'Hora', 'Servicio', 'Método de Pago', 'Cliente', 'Total'],
+      headers: ['Fecha', 'Hora', 'Servicio', 'Método de Pago', 'Cliente', 'Concepto', 'Total'],
       rows: barber.services.map(s => [
         formatDate(s.created_at),
         formatTime(s.created_at),
         s.service_type,
         s.payment_method || 'efectivo',
         s.customer_name || '-',
+        s.concept || '-',
         formatCurrency(s.barber_earning),
       ]),
     };
@@ -182,10 +185,10 @@ const AdminStats = () => {
     }
 
     // Add totals
-    data.rows.push(['', '', '', '', '', '']);
-    data.rows.push(['', '', '', '', 'Total Servicios:', formatCurrency(barber.totalEarnings)]);
-    data.rows.push(['', '', '', '', 'Total Descuentos:', `-${formatCurrency(barber.totalDeductions)}`]);
-    data.rows.push(['', '', '', '', 'TOTAL NETO:', formatCurrency(barber.netEarnings)]);
+    data.rows.push(['', '', '', '', '', '', '']);
+    data.rows.push(['', '', '', '', '', 'Total Servicios:', formatCurrency(barber.totalEarnings)]);
+    data.rows.push(['', '', '', '', '', 'Total Descuentos:', `-${formatCurrency(barber.totalDeductions)}`]);
+    data.rows.push(['', '', '', '', '', 'TOTAL NETO:', formatCurrency(barber.netEarnings)]);
 
     const filename = `estadisticas-${barber.barberName.toLowerCase().replace(/\s+/g, '-')}-${format(weekStart, 'yyyy-MM-dd')}`;
     
@@ -254,6 +257,7 @@ const AdminStats = () => {
                           <TableHead>Servicio</TableHead>
                           <TableHead>Método de Pago</TableHead>
                           <TableHead>Cliente</TableHead>
+                          <TableHead>Concepto</TableHead>
                           <TableHead>Foto</TableHead>
                           <TableHead className="text-right">Total</TableHead>
                         </TableRow>
@@ -266,6 +270,7 @@ const AdminStats = () => {
                             <TableCell>{service.service_type}</TableCell>
                             <TableCell className="capitalize">{service.payment_method || "efectivo"}</TableCell>
                             <TableCell>{service.customer_name || "-"}</TableCell>
+                            <TableCell>{service.concept || "-"}</TableCell>
                             <TableCell>
                               {service.payment_photo_url ? (
                                 <Button
@@ -285,7 +290,7 @@ const AdminStats = () => {
                           </TableRow>
                         ))}
                         <TableRow className="bg-muted/50 font-bold">
-                          <TableCell colSpan={6}>Total Servicios</TableCell>
+                          <TableCell colSpan={7}>Total Servicios</TableCell>
                           <TableCell className="text-right text-green-600">
                             {formatCurrency(barber.totalEarnings)}
                           </TableCell>
@@ -293,7 +298,7 @@ const AdminStats = () => {
                         {barber.deductions.length > 0 && (
                           <>
                             <TableRow className="bg-destructive/10">
-                              <TableCell colSpan={7} className="font-bold text-destructive">
+                              <TableCell colSpan={8} className="font-bold text-destructive">
                                 Descuentos
                               </TableCell>
                             </TableRow>
@@ -301,14 +306,14 @@ const AdminStats = () => {
                               <TableRow key={d.id} className="bg-destructive/5">
                                 <TableCell>{formatDate(d.created_at)}</TableCell>
                                 <TableCell>{formatTime(d.created_at)}</TableCell>
-                                <TableCell colSpan={4}>{d.concept}</TableCell>
+                                <TableCell colSpan={5}>{d.concept}</TableCell>
                                 <TableCell className="text-right font-medium text-destructive">
                                   -{formatCurrency(d.amount)}
                                 </TableCell>
                               </TableRow>
                             ))}
                             <TableRow className="bg-destructive/10 font-bold">
-                              <TableCell colSpan={6}>Total Descuentos</TableCell>
+                              <TableCell colSpan={7}>Total Descuentos</TableCell>
                               <TableCell className="text-right text-destructive">
                                 -{formatCurrency(barber.totalDeductions)}
                               </TableCell>
@@ -316,7 +321,7 @@ const AdminStats = () => {
                           </>
                         )}
                         <TableRow className="bg-primary/10 font-bold text-lg">
-                          <TableCell colSpan={6}>TOTAL NETO</TableCell>
+                          <TableCell colSpan={7}>TOTAL NETO</TableCell>
                           <TableCell className="text-right text-primary">
                             {formatCurrency(barber.netEarnings)}
                           </TableCell>

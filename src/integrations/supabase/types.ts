@@ -201,6 +201,7 @@ export type Database = {
         Row: {
           barber_earning: number
           barber_id: string
+          concept: string | null
           created_at: string
           customer_name: string | null
           id: string
@@ -212,6 +213,7 @@ export type Database = {
         Insert: {
           barber_earning?: number
           barber_id: string
+          concept?: string | null
           created_at?: string
           customer_name?: string | null
           id?: string
@@ -223,6 +225,7 @@ export type Database = {
         Update: {
           barber_earning?: number
           barber_id?: string
+          concept?: string | null
           created_at?: string
           customer_name?: string | null
           id?: string
