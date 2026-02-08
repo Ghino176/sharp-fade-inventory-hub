@@ -31,7 +31,7 @@ const manuelEarnings: Record<string, number> = {
   "Afeitado": 1,
   "Facial Primera Vez": 3,
   "Facial": 3,
-  "Corte+Barba Premium": 4,
+  "Corte+Barba Premium": 5.6,
   "Corte+Barba Sencilla": 4.4,
   "Mascarilla Completa": 0.5,
   "Promo Pana": 4,
