@@ -39,30 +39,34 @@ const ServicesManager = () => {
   
   const [newService, setNewService] = useState({
     barber_id: "",
+    barber_id_2: "",
     service_type: "",
     barber_earning: "",
     tip: "",
     payment_method: "efectivo",
     customer_name: "",
+    concept: "",
     payment_photo: null as File | null,
   });
 
   const paymentMethods = [
     { value: "efectivo", label: "Efectivo" },
     { value: "pago movil", label: "Pago Móvil" },
-    { value: "transferencia", label: "Transferencia" },
-    { value: "zelle", label: "Zelle" },
+    { value: "efectivo + pago movil", label: "Efectivo + Pago Móvil" },
+    { value: "deuda", label: "Deuda" },
   ];
 
   const serviceTypes = [
-    { name: "Corte", label: "Corte", earning: 4.6 },
-    { name: "Barba Sencilla", label: "Barba Sencilla", earning: 1 },
-    { name: "Barba Premium", label: "Barba Premium", earning: 2 },
-    { name: "Afeitado", label: "Afeitado", earning: 1 },
-    { name: "Facial Primera Vez", label: "Facial Primera Vez", earning: 4 },
-    { name: "Facial", label: "Facial", earning: 5 },
-    { name: "Corte+Barba Premium", label: "Corte+Barba Premium", earning: 6.6 },
-    { name: "Mascarilla Completa", label: "Mascarilla Completa", earning: 0.5 },
+    { name: "Corte", label: "Corte", earning: 4.6, manuelEarning: 3.4, isPromo: false },
+    { name: "Barba Sencilla", label: "Barba Sencilla", earning: 1, manuelEarning: 1, isPromo: false },
+    { name: "Barba Premium", label: "Barba Premium", earning: 2, manuelEarning: 2, isPromo: false },
+    { name: "Afeitado", label: "Afeitado", earning: 1, manuelEarning: 1, isPromo: false },
+    { name: "Facial Primera Vez", label: "Facial Primera Vez", earning: 4, manuelEarning: 3, isPromo: false },
+    { name: "Facial", label: "Facial", earning: 5, manuelEarning: 3, isPromo: false },
+    { name: "Corte+Barba Premium", label: "Corte+Barba Premium", earning: 6.6, manuelEarning: 4, isPromo: false },
+    { name: "Corte+Barba Sencilla", label: "Corte+Barba Sencilla", earning: 5.6, manuelEarning: 4.4, isPromo: false },
+    { name: "Mascarilla Completa", label: "Mascarilla Completa", earning: 0.5, manuelEarning: 0.5, isPromo: false },
+    { name: "Promo Pana", label: "Promo Pana", earning: 3, manuelEarning: 8, isPromo: true },
   ];
 
   useEffect(() => {
@@ -129,7 +133,8 @@ const ServicesManager = () => {
     setNewService(prev => ({
       ...prev,
       service_type: serviceType,
-      barber_earning: selectedService ? selectedService.earning.toString() : ""
+      barber_earning: selectedService ? selectedService.earning.toString() : "",
+      barber_id_2: selectedService?.isPromo ? prev.barber_id_2 : "",
     }));
   };
 
@@ -169,10 +174,22 @@ const ServicesManager = () => {
   };
 
   const handleAddService = async () => {
+    const selectedServiceType = serviceTypes.find(s => s.name === newService.service_type);
+    const isPromo = selectedServiceType?.isPromo || false;
+
     if (!newService.barber_id || !newService.service_type) {
       toast({
         title: "Error",
         description: "Por favor selecciona barbero y servicio",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isPromo && !newService.barber_id_2) {
+      toast({
+        title: "Error",
+        description: "Para Promo Pana debes seleccionar dos barberos",
         variant: "destructive",
       });
       return;
@@ -185,68 +202,105 @@ const ServicesManager = () => {
       const totalEarning = baseEarning + tip;
 
       let paymentPhotoUrl: string | null = null;
-      if (newService.payment_photo && newService.payment_method === "pago movil") {
+      if (newService.payment_photo && (newService.payment_method === "pago movil" || newService.payment_method === "efectivo + pago movil")) {
         paymentPhotoUrl = await uploadPaymentPhoto(newService.payment_photo);
       }
 
-      const serviceData = {
-        barber_id: newService.barber_id,
-        service_type: newService.service_type,
-        price: 0,
-        barber_earning: totalEarning,
-        payment_method: newService.payment_method,
-        customer_name: newService.customer_name || null,
-        payment_photo_url: paymentPhotoUrl,
-      };
+      // For promo, create two services (one for each barber)
+      if (isPromo) {
+        const serviceData1 = {
+          barber_id: newService.barber_id,
+          service_type: newService.service_type,
+          price: 0,
+          barber_earning: totalEarning,
+          payment_method: newService.payment_method,
+          customer_name: newService.customer_name || null,
+          payment_photo_url: paymentPhotoUrl,
+          concept: newService.concept || null,
+        };
 
-      const { data, error } = await supabase
-        .from('services')
-        .insert([serviceData])
-        .select(`
-          *,
-          barbers(id, name)
-        `)
-        .single();
+        const serviceData2 = {
+          barber_id: newService.barber_id_2,
+          service_type: newService.service_type,
+          price: 0,
+          barber_earning: totalEarning,
+          payment_method: newService.payment_method,
+          customer_name: newService.customer_name || null,
+          payment_photo_url: paymentPhotoUrl,
+          concept: newService.concept || null,
+        };
 
-      if (error) throw error;
+        const { error: error1 } = await supabase.from('services').insert([serviceData1]);
+        if (error1) throw error1;
 
-      // Update barber counts
-      const countColumn = newService.service_type.toLowerCase().includes('corte') ? 'cuts_count' 
-        : newService.service_type.toLowerCase().includes('barba') ? 'beards_count' 
-        : 'eyebrows_count';
+        const { error: error2 } = await supabase.from('services').insert([serviceData2]);
+        if (error2) throw error2;
 
-      const { data: currentBarber } = await supabase
-        .from('barbers')
-        .select('cuts_count, beards_count, eyebrows_count')
-        .eq('id', newService.barber_id)
-        .single();
+        await fetchServices();
+      } else {
+        const serviceData = {
+          barber_id: newService.barber_id,
+          service_type: newService.service_type,
+          price: 0,
+          barber_earning: totalEarning,
+          payment_method: newService.payment_method,
+          customer_name: newService.customer_name || null,
+          payment_photo_url: paymentPhotoUrl,
+          concept: newService.concept || null,
+        };
 
-      if (currentBarber) {
-        const updateData: Record<string, number> = {};
-        updateData[countColumn] = ((currentBarber as Record<string, number>)[countColumn] || 0) + 1;
-        
-        await supabase
+        const { data, error } = await supabase
+          .from('services')
+          .insert([serviceData])
+          .select(`
+            *,
+            barbers(id, name)
+          `)
+          .single();
+
+        if (error) throw error;
+
+        // Update barber counts
+        const countColumn = newService.service_type.toLowerCase().includes('corte') ? 'cuts_count' 
+          : newService.service_type.toLowerCase().includes('barba') ? 'beards_count' 
+          : 'eyebrows_count';
+
+        const { data: currentBarber } = await supabase
           .from('barbers')
-          .update(updateData)
-          .eq('id', newService.barber_id);
+          .select('cuts_count, beards_count, eyebrows_count')
+          .eq('id', newService.barber_id)
+          .single();
+
+        if (currentBarber) {
+          const updateData: Record<string, number> = {};
+          updateData[countColumn] = ((currentBarber as Record<string, number>)[countColumn] || 0) + 1;
+          
+          await supabase
+            .from('barbers')
+            .update(updateData)
+            .eq('id', newService.barber_id);
+        }
+
+        const newServiceWithBarber = {
+          ...data,
+          barber: data.barbers ? {
+            id: data.barbers.id,
+            name: data.barbers.name
+          } : undefined
+        };
+
+        setServices(prev => [newServiceWithBarber, ...prev]);
       }
 
-      const newServiceWithBarber = {
-        ...data,
-        barber: data.barbers ? {
-          id: data.barbers.id,
-          name: data.barbers.name
-        } : undefined
-      };
-
-      setServices(prev => [newServiceWithBarber, ...prev]);
       setNewService({
         barber_id: "",
+        barber_id_2: "",
         service_type: "",
         barber_earning: "",
         tip: "",
         payment_method: "efectivo",
         customer_name: "",
+        concept: "",
         payment_photo: null,
       });
       setPreviewImage(null);
@@ -334,7 +388,7 @@ const ServicesManager = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="barber_id">Barbero</Label>
+              <Label htmlFor="barber_id">Barbero {serviceTypes.find(s => s.name === newService.service_type)?.isPromo ? "1" : ""}</Label>
               <Select value={newService.barber_id} onValueChange={(value) => setNewService(prev => ({ ...prev, barber_id: value }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar barbero" />
@@ -348,6 +402,25 @@ const ServicesManager = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Second barber for Promo Pana */}
+            {serviceTypes.find(s => s.name === newService.service_type)?.isPromo && (
+              <div className="space-y-2">
+                <Label htmlFor="barber_id_2">Barbero 2</Label>
+                <Select value={newService.barber_id_2} onValueChange={(value) => setNewService(prev => ({ ...prev, barber_id_2: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar segundo barbero" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {barbers.filter(b => b.id !== newService.barber_id).map((barber) => (
+                      <SelectItem key={barber.id} value={barber.id}>
+                        {barber.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="service_type">Servicio</Label>
@@ -410,8 +483,19 @@ const ServicesManager = () => {
               />
             </div>
 
-            {/* Payment Photo for Pago Móvil */}
-            {newService.payment_method === "pago movil" && (
+            {/* Concept field */}
+            <div className="space-y-2">
+              <Label htmlFor="concept">Concepto</Label>
+              <Input
+                id="concept"
+                value={newService.concept}
+                onChange={(e) => setNewService(prev => ({ ...prev, concept: e.target.value }))}
+                placeholder="Concepto (opcional)"
+              />
+            </div>
+
+            {/* Payment Photo for Pago Móvil or Efectivo + Pago Móvil */}
+            {(newService.payment_method === "pago movil" || newService.payment_method === "efectivo + pago movil") && (
               <div className="space-y-2">
                 <Label htmlFor="payment_photo" className="flex items-center gap-1">
                   <Camera className="h-4 w-4" />

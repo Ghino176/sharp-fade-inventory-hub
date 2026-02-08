@@ -18,6 +18,7 @@ interface ServiceRecord {
   payment_method: string | null;
   payment_photo_url: string | null;
   customer_name: string | null;
+  concept: string | null;
   created_at: string;
 }
 
@@ -97,7 +98,7 @@ const UserStats = () => {
       const [servicesRes, deductionsRes] = await Promise.all([
         supabase
           .from("services")
-          .select("id, service_type, created_at, barber_earning, payment_method, customer_name, payment_photo_url")
+          .select("id, service_type, created_at, barber_earning, payment_method, customer_name, payment_photo_url, concept")
           .eq("barber_id", barberId)
           .gte("created_at", weekStart.toISOString())
           .lte("created_at", weekEnd.toISOString())
@@ -121,6 +122,7 @@ const UserStats = () => {
         payment_method: s.payment_method,
         payment_photo_url: s.payment_photo_url,
         customer_name: s.customer_name,
+        concept: s.concept,
         created_at: s.created_at,
       }));
 
@@ -168,13 +170,14 @@ const UserStats = () => {
     
     const data = {
       title: `Mis Estadísticas ${barberName || ''} - ${format(weekStart, 'dd/MM')} al ${format(weekEnd, 'dd/MM/yyyy')}`,
-      headers: ['Fecha', 'Hora', 'Servicio', 'Método de Pago', 'Cliente', 'Total'],
+      headers: ['Fecha', 'Hora', 'Servicio', 'Método de Pago', 'Cliente', 'Concepto', 'Total'],
       rows: services.map(s => [
         formatDate(s.created_at),
         formatTime(s.created_at),
         s.service_type,
         s.payment_method || 'efectivo',
         s.customer_name || '-',
+        s.concept || '-',
         formatCurrency(s.barber_earning),
       ]),
     };
@@ -196,10 +199,10 @@ const UserStats = () => {
     }
 
     // Add totals
-    data.rows.push(['', '', '', '', '', '']);
-    data.rows.push(['', '', '', '', 'Total Servicios:', formatCurrency(totalEarnings)]);
-    data.rows.push(['', '', '', '', 'Total Descuentos:', `-${formatCurrency(totalDeductions)}`]);
-    data.rows.push(['', '', '', '', 'TOTAL NETO:', formatCurrency(totalEarnings - totalDeductions)]);
+    data.rows.push(['', '', '', '', '', '', '']);
+    data.rows.push(['', '', '', '', '', 'Total Servicios:', formatCurrency(totalEarnings)]);
+    data.rows.push(['', '', '', '', '', 'Total Descuentos:', `-${formatCurrency(totalDeductions)}`]);
+    data.rows.push(['', '', '', '', '', 'TOTAL NETO:', formatCurrency(totalEarnings - totalDeductions)]);
 
     const filename = `mis-estadisticas-${format(weekStart, 'yyyy-MM-dd')}`;
     
@@ -280,6 +283,7 @@ const UserStats = () => {
                     <TableHead>Servicio</TableHead>
                     <TableHead>Método de Pago</TableHead>
                     <TableHead>Cliente</TableHead>
+                    <TableHead>Concepto</TableHead>
                     <TableHead>Foto</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                   </TableRow>
@@ -292,6 +296,7 @@ const UserStats = () => {
                       <TableCell>{service.service_type}</TableCell>
                       <TableCell className="capitalize">{service.payment_method || "efectivo"}</TableCell>
                       <TableCell>{service.customer_name || "-"}</TableCell>
+                      <TableCell>{service.concept || "-"}</TableCell>
                       <TableCell>
                         {service.payment_photo_url ? (
                           <Button
@@ -311,7 +316,7 @@ const UserStats = () => {
                     </TableRow>
                   ))}
                   <TableRow className="bg-muted/50 font-bold">
-                    <TableCell colSpan={6}>Total Servicios</TableCell>
+                    <TableCell colSpan={7}>Total Servicios</TableCell>
                     <TableCell className="text-right text-green-600">
                       {formatCurrency(totalEarnings)}
                     </TableCell>
@@ -319,7 +324,7 @@ const UserStats = () => {
                   {deductions.length > 0 && (
                     <>
                       <TableRow className="bg-destructive/10">
-                        <TableCell colSpan={7} className="font-bold text-destructive">
+                        <TableCell colSpan={8} className="font-bold text-destructive">
                           Descuentos
                         </TableCell>
                       </TableRow>
@@ -327,14 +332,14 @@ const UserStats = () => {
                         <TableRow key={d.id} className="bg-destructive/5">
                           <TableCell>{formatDate(d.created_at)}</TableCell>
                           <TableCell>{formatTime(d.created_at)}</TableCell>
-                          <TableCell colSpan={4}>{d.concept}</TableCell>
+                          <TableCell colSpan={5}>{d.concept}</TableCell>
                           <TableCell className="text-right font-medium text-destructive">
                             -{formatCurrency(d.amount)}
                           </TableCell>
                         </TableRow>
                       ))}
                       <TableRow className="bg-destructive/10 font-bold">
-                        <TableCell colSpan={6}>Total Descuentos</TableCell>
+                        <TableCell colSpan={7}>Total Descuentos</TableCell>
                         <TableCell className="text-right text-destructive">
                           -{formatCurrency(totalDeductions)}
                         </TableCell>
@@ -342,7 +347,7 @@ const UserStats = () => {
                     </>
                   )}
                   <TableRow className="bg-primary/10 font-bold text-lg">
-                    <TableCell colSpan={6}>TOTAL NETO</TableCell>
+                    <TableCell colSpan={7}>TOTAL NETO</TableCell>
                     <TableCell className="text-right text-primary">
                       {formatCurrency(totalEarnings - totalDeductions)}
                     </TableCell>
