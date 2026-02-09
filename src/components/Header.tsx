@@ -22,7 +22,7 @@ const Header = ({ activeSection, onSectionChange, userName, userRole }: HeaderPr
     { id: "barbers", label: "Barberos" },
     { id: "deductions", label: "Descuentos" },
     { id: "weekly-stats", label: "Estadísticas" },
-    { id: "data-manager", label: "Gestión" },
+    
   ];
 
   // Add Manuel stats only for admins
