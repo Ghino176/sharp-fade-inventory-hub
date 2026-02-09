@@ -256,16 +256,17 @@ const InventoryManager = () => {
   };
 
   const handleAddSale = async () => {
-    if (!newSale.inventory_id || !newSale.quantity || !newSale.sale_price) {
-      toast({ title: "Error", description: "Completa todos los campos requeridos", variant: "destructive" });
+    const quantity = parseInt(newSale.quantity);
+    const salePrice = parseFloat(newSale.sale_price);
+    
+    if (!newSale.inventory_id || isNaN(quantity) || quantity <= 0 || isNaN(salePrice) || salePrice <= 0) {
+      toast({ title: "Error", description: "Completa todos los campos requeridos (Producto, Cantidad y Precio)", variant: "destructive" });
       return;
     }
 
     const selectedItem = inventory.find(i => i.id === newSale.inventory_id);
     if (!selectedItem) return;
 
-    const quantity = parseInt(newSale.quantity);
-    const salePrice = parseFloat(newSale.sale_price);
     const unitCost = selectedItem.unit_price;
     const profit = (salePrice - unitCost) * quantity;
 
