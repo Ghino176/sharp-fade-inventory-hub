@@ -256,16 +256,44 @@ const InventoryManager = () => {
   };
 
   const handleAddSale = async () => {
-    const quantity = parseInt(newSale.quantity);
-    const salePrice = parseFloat(newSale.sale_price);
-    
-    if (!newSale.inventory_id || isNaN(quantity) || quantity <= 0 || isNaN(salePrice) || salePrice <= 0) {
-      toast({ title: "Error", description: "Completa todos los campos requeridos (Producto, Cantidad y Precio)", variant: "destructive" });
+    const quantity = Number(newSale.quantity);
+    const salePrice = Number(newSale.sale_price);
+
+    console.log("[inventory-sale] submit", {
+      inventory_id: newSale.inventory_id,
+      quantity_raw: newSale.quantity,
+      sale_price_raw: newSale.sale_price,
+      quantity,
+      salePrice,
+    });
+
+    const missing: string[] = [];
+    if (!newSale.inventory_id) missing.push("Producto");
+    if (!newSale.quantity || Number.isNaN(quantity) || quantity <= 0) missing.push("Cantidad");
+    if (!newSale.sale_price || Number.isNaN(salePrice) || salePrice <= 0) missing.push("Precio");
+
+    if (missing.length) {
+      toast({
+        title: "Error",
+        description: `Faltan o son inválidos: ${missing.join(", ")}`,
+        variant: "destructive",
+      });
       return;
     }
 
-    const selectedItem = inventory.find(i => i.id === newSale.inventory_id);
-    if (!selectedItem) return;
+    const selectedItem = inventory.find((i) => i.id === newSale.inventory_id);
+    if (!selectedItem) {
+      console.log("[inventory-sale] invalid inventory_id", {
+        inventory_id: newSale.inventory_id,
+        available_ids: inventory.map((i) => i.id),
+      });
+      toast({
+        title: "Error",
+        description: "Selecciona un producto válido",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const unitCost = selectedItem.unit_price;
     const profit = (salePrice - unitCost) * quantity;
