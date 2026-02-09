@@ -412,7 +412,7 @@ const ServicesManager = () => {
                     <SelectValue placeholder="Seleccionar segundo barbero" />
                   </SelectTrigger>
                   <SelectContent>
-                    {barbers.filter(b => b.id !== newService.barber_id).map((barber) => (
+                    {barbers.map((barber) => (
                       <SelectItem key={barber.id} value={barber.id}>
                         {barber.name}
                       </SelectItem>
