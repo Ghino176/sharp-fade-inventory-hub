@@ -272,8 +272,16 @@ const ServicesManager = () => {
           .single();
 
         if (currentBarber) {
-          const updateData: Record<string, number> = {};
-          updateData[countColumn] = ((currentBarber as Record<string, number>)[countColumn] || 0) + 1;
+          const updateData: { cuts_count?: number; beards_count?: number; eyebrows_count?: number } = {};
+          const currentCounts = currentBarber as { cuts_count?: number; beards_count?: number; eyebrows_count?: number };
+
+          if (countColumn === 'cuts_count') {
+            updateData.cuts_count = (currentCounts.cuts_count || 0) + 1;
+          } else if (countColumn === 'beards_count') {
+            updateData.beards_count = (currentCounts.beards_count || 0) + 1;
+          } else {
+            updateData.eyebrows_count = (currentCounts.eyebrows_count || 0) + 1;
+          }
           
           await supabase
             .from('barbers')
