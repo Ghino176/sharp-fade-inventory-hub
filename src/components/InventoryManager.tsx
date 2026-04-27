@@ -77,8 +77,9 @@ const InventoryManager = () => {
 
   const selectedSaleItem = inventory.find((item) => item.id === newSale.inventory_id);
   const saleQuantity = Number(newSale.quantity);
-  const calculatedSaleTotal = selectedSaleItem && saleQuantity > 0
-    ? Number(selectedSaleItem.unit_price) * saleQuantity
+  const effectiveSaleQuantity = saleQuantity > 0 ? saleQuantity : selectedSaleItem ? 1 : 0;
+  const calculatedSaleTotal = selectedSaleItem
+    ? Number(selectedSaleItem.unit_price) * effectiveSaleQuantity
     : 0;
 
   const getEffectiveSaleProfit = (sale: Pick<InventorySale, "profit" | "sale_price" | "quantity">) => {
@@ -648,7 +649,12 @@ const InventoryManager = () => {
               <Label>Producto</Label>
               <Select
                 value={newSale.inventory_id}
-                onValueChange={(value) => setNewSale(prev => ({ ...prev, inventory_id: value }))}
+                onValueChange={(value) => setNewSale(prev => ({
+                  ...prev,
+                  inventory_id: value,
+                  quantity: prev.quantity || "1",
+                  sale_price: "",
+                }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar producto" />
@@ -680,10 +686,15 @@ const InventoryManager = () => {
                 type="number"
                 step="0.01"
                 min="0"
-                value={newSale.sale_price}
-                onChange={(e) => setNewSale(prev => ({ ...prev, sale_price: e.target.value }))}
-                placeholder="0.00"
+                value={selectedSaleItem ? calculatedSaleTotal.toFixed(2) : ""}
+                readOnly
+                placeholder="Se calcula automáticamente"
               />
+              <p className="text-xs text-muted-foreground">
+                {selectedSaleItem
+                  ? `${selectedSaleItem.name}: ${formatCurrency(Number(selectedSaleItem.unit_price))} x ${effectiveSaleQuantity}`
+                  : "Selecciona un producto para calcular el total"}
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -746,7 +757,7 @@ const InventoryManager = () => {
                     <TableCell>{sale.customer_name || '-'}</TableCell>
                     <TableCell className="capitalize">{sale.payment_method || 'efectivo'}</TableCell>
                     <TableCell className="text-right">{formatCurrency(Number(sale.sale_price) * sale.quantity)}</TableCell>
-                    <TableCell className="text-right font-medium text-green-600">{formatCurrency(Number(sale.profit))}</TableCell>
+                    <TableCell className="text-right font-medium text-green-600">{formatCurrency(getEffectiveSaleProfit(sale))}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="destructive" size="sm" onClick={() => handleDeleteSale(sale)}>
                         <Trash2 className="h-4 w-4" />
