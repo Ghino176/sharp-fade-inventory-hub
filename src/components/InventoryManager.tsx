@@ -75,6 +75,19 @@ const InventoryManager = () => {
     payment_method: "efectivo",
   });
 
+  const selectedSaleItem = inventory.find((item) => item.id === newSale.inventory_id);
+  const saleQuantity = Number(newSale.quantity);
+  const effectiveSaleQuantity = saleQuantity > 0 ? saleQuantity : selectedSaleItem ? 1 : 0;
+  const calculatedSaleTotal = selectedSaleItem
+    ? Number(selectedSaleItem.unit_price) * effectiveSaleQuantity
+    : 0;
+
+  const getEffectiveSaleProfit = (sale: Pick<InventorySale, "profit" | "sale_price" | "quantity">) => {
+    const storedProfit = Number(sale.profit || 0);
+    const saleRevenue = Number(sale.sale_price || 0) * Number(sale.quantity || 0);
+    return Math.max(storedProfit, saleRevenue);
+  };
+
   useEffect(() => {
     fetchInventoryData();
   }, [selectedDate]);
@@ -257,20 +270,18 @@ const InventoryManager = () => {
 
   const handleAddSale = async () => {
     const quantity = Number(newSale.quantity);
-    const salePrice = Number(newSale.sale_price);
 
     console.log("[inventory-sale] submit", {
       inventory_id: newSale.inventory_id,
       quantity_raw: newSale.quantity,
-      sale_price_raw: newSale.sale_price,
       quantity,
-      salePrice,
+      selected_unit_price: selectedSaleItem?.unit_price,
+      calculated_total: calculatedSaleTotal,
     });
 
     const missing: string[] = [];
     if (!newSale.inventory_id) missing.push("Producto");
     if (!newSale.quantity || Number.isNaN(quantity) || quantity <= 0) missing.push("Cantidad");
-    if (!newSale.sale_price || Number.isNaN(salePrice) || salePrice <= 0) missing.push("Precio");
 
     if (missing.length) {
       toast({
@@ -281,7 +292,7 @@ const InventoryManager = () => {
       return;
     }
 
-    const selectedItem = inventory.find((i) => i.id === newSale.inventory_id);
+    const selectedItem = selectedSaleItem;
     if (!selectedItem) {
       console.log("[inventory-sale] invalid inventory_id", {
         inventory_id: newSale.inventory_id,
@@ -295,8 +306,8 @@ const InventoryManager = () => {
       return;
     }
 
-    const unitCost = selectedItem.unit_price;
-    const profit = (salePrice - unitCost) * quantity;
+    const unitPrice = Number(selectedItem.unit_price || 0);
+    const profit = unitPrice * quantity;
 
     if (quantity > selectedItem.quantity) {
       toast({ title: "Error", description: "No hay suficiente stock", variant: "destructive" });
@@ -310,8 +321,8 @@ const InventoryManager = () => {
           inventory_id: newSale.inventory_id,
           product_name: selectedItem.name,
           quantity,
-          unit_cost: unitCost,
-          sale_price: salePrice,
+          unit_cost: unitPrice,
+          sale_price: unitPrice,
           profit,
           customer_name: newSale.customer_name || null,
           payment_method: newSale.payment_method,
@@ -328,12 +339,7 @@ const InventoryManager = () => {
 
       if (updateError) throw updateError;
 
-      setInventorySales(prev => [saleData, ...prev]);
-      setInventory(prev => prev.map(item => 
-        item.id === newSale.inventory_id 
-          ? { ...item, quantity: item.quantity - quantity }
-          : item
-      ));
+      await fetchInventoryData();
 
       setNewSale({ inventory_id: "", quantity: "", sale_price: "", customer_name: "", payment_method: "efectivo" });
 
@@ -383,7 +389,7 @@ const InventoryManager = () => {
   const formatDate = (dateStr: string) => format(parseISO(dateStr), "dd/MM/yyyy");
   const formatTime = (dateStr: string) => format(parseISO(dateStr), "h:mm a");
 
-  const totalInventoryProfit = inventorySales.reduce((sum, s) => sum + Number(s.profit), 0);
+  const totalInventoryProfit = inventorySales.reduce((sum, sale) => sum + getEffectiveSaleProfit(sale), 0);
 
   const handleExportSales = (type: 'excel' | 'pdf') => {
     const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
@@ -400,7 +406,7 @@ const InventoryManager = () => {
         s.customer_name || '-',
         s.payment_method || 'efectivo',
         formatCurrency(Number(s.sale_price) * s.quantity),
-        formatCurrency(Number(s.profit)),
+        formatCurrency(getEffectiveSaleProfit(s)),
       ]),
     };
 
@@ -643,7 +649,12 @@ const InventoryManager = () => {
               <Label>Producto</Label>
               <Select
                 value={newSale.inventory_id}
-                onValueChange={(value) => setNewSale(prev => ({ ...prev, inventory_id: value }))}
+                onValueChange={(value) => setNewSale(prev => ({
+                  ...prev,
+                  inventory_id: value,
+                  quantity: prev.quantity || "1",
+                  sale_price: "",
+                }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar producto" />
@@ -675,10 +686,15 @@ const InventoryManager = () => {
                 type="number"
                 step="0.01"
                 min="0"
-                value={newSale.sale_price}
-                onChange={(e) => setNewSale(prev => ({ ...prev, sale_price: e.target.value }))}
-                placeholder="0.00"
+                value={selectedSaleItem ? calculatedSaleTotal.toFixed(2) : ""}
+                readOnly
+                placeholder="Se calcula automáticamente"
               />
+              <p className="text-xs text-muted-foreground">
+                {selectedSaleItem
+                  ? `${selectedSaleItem.name}: ${formatCurrency(Number(selectedSaleItem.unit_price))} x ${effectiveSaleQuantity}`
+                  : "Selecciona un producto para calcular el total"}
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -741,7 +757,7 @@ const InventoryManager = () => {
                     <TableCell>{sale.customer_name || '-'}</TableCell>
                     <TableCell className="capitalize">{sale.payment_method || 'efectivo'}</TableCell>
                     <TableCell className="text-right">{formatCurrency(Number(sale.sale_price) * sale.quantity)}</TableCell>
-                    <TableCell className="text-right font-medium text-green-600">{formatCurrency(Number(sale.profit))}</TableCell>
+                    <TableCell className="text-right font-medium text-green-600">{formatCurrency(getEffectiveSaleProfit(sale))}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="destructive" size="sm" onClick={() => handleDeleteSale(sale)}>
                         <Trash2 className="h-4 w-4" />
