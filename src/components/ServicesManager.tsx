@@ -29,9 +29,12 @@ interface Service {
 
 const ServicesManager = () => {
   const { toast } = useToast();
+  const PAGE_SIZE = 50;
   const [services, setServices] = useState<Service[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [viewImageUrl, setViewImageUrl] = useState<string | null>(null);
@@ -97,18 +100,20 @@ const ServicesManager = () => {
     }
   };
 
-  const fetchServices = async () => {
+  const fetchServices = async (offset = 0, append = false) => {
     try {
+      if (append) setLoadingMore(true);
       const { data, error } = await supabase
         .from('services')
         .select(`
           *,
           barbers(id, name)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
 
       if (error) throw error;
-      
+
       const servicesWithBarber = data?.map(service => ({
         ...service,
         barber: service.barbers ? {
@@ -116,8 +121,9 @@ const ServicesManager = () => {
           name: service.barbers.name
         } : undefined
       })) || [];
-      
-      setServices(servicesWithBarber);
+
+      setHasMore((data?.length || 0) === PAGE_SIZE);
+      setServices(prev => append ? [...prev, ...servicesWithBarber] : servicesWithBarber);
     } catch (error) {
       console.error('Error fetching services:', error);
       toast({
@@ -125,6 +131,8 @@ const ServicesManager = () => {
         description: "No se pudieron cargar los servicios",
         variant: "destructive",
       });
+    } finally {
+      if (append) setLoadingMore(false);
     }
   };
 
@@ -621,6 +629,18 @@ const ServicesManager = () => {
             {services.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 No hay servicios registrados
+              </div>
+            )}
+
+            {hasMore && services.length > 0 && (
+              <div className="text-center pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => fetchServices(services.length, true)}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? "Cargando..." : "Cargar más"}
+                </Button>
               </div>
             )}
           </div>
