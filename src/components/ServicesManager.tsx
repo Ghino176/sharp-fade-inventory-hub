@@ -631,6 +631,18 @@ const ServicesManager = () => {
                 No hay servicios registrados
               </div>
             )}
+
+            {hasMore && services.length > 0 && (
+              <div className="text-center pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => fetchServices(services.length, true)}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? "Cargando..." : "Cargar más"}
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
