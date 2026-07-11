@@ -29,9 +29,12 @@ interface Service {
 
 const ServicesManager = () => {
   const { toast } = useToast();
+  const PAGE_SIZE = 50;
   const [services, setServices] = useState<Service[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [viewImageUrl, setViewImageUrl] = useState<string | null>(null);
