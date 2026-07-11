@@ -100,18 +100,20 @@ const ServicesManager = () => {
     }
   };
 
-  const fetchServices = async () => {
+  const fetchServices = async (offset = 0, append = false) => {
     try {
+      if (append) setLoadingMore(true);
       const { data, error } = await supabase
         .from('services')
         .select(`
           *,
           barbers(id, name)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
 
       if (error) throw error;
-      
+
       const servicesWithBarber = data?.map(service => ({
         ...service,
         barber: service.barbers ? {
@@ -119,8 +121,9 @@ const ServicesManager = () => {
           name: service.barbers.name
         } : undefined
       })) || [];
-      
-      setServices(servicesWithBarber);
+
+      setHasMore((data?.length || 0) === PAGE_SIZE);
+      setServices(prev => append ? [...prev, ...servicesWithBarber] : servicesWithBarber);
     } catch (error) {
       console.error('Error fetching services:', error);
       toast({
@@ -128,6 +131,8 @@ const ServicesManager = () => {
         description: "No se pudieron cargar los servicios",
         variant: "destructive",
       });
+    } finally {
+      if (append) setLoadingMore(false);
     }
   };
 
