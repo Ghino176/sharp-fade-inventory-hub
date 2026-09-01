@@ -24,17 +24,17 @@ interface ServiceRecord {
 
 // Manuel's earning rates per service
 const manuelEarnings: Record<string, number> = {
-  "Corte": 3.4,
+  "Corte": 4,
   "Barba Sencilla": 1,
   "Barba Premium": 2,
   "Cejas": 0.5,
   "Afeitado": 1,
   "Facial Primera Vez": 3,
   "Facial": 3,
-  "Corte+Barba Premium": 5.6,
-  "Corte+Barba Sencilla": 4.4,
+  "Corte+Barba Premium": 6,
+  "Corte+Barba Sencilla": 5,
   "Mascarilla Completa": 0.5,
-  "Promo Pana": 2,
+  "Promo Pana": 4,
 };
 
 const ManuelStats = () => {
