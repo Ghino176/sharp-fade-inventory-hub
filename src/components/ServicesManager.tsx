@@ -60,16 +60,17 @@ const ServicesManager = () => {
   ];
 
   const serviceTypes = [
+    { name: "Afeitado", label: "Afeitado", earning: 1, manuelEarning: 1, isPromo: false },    
     { name: "Corte", label: "Corte", earning: 6, manuelEarning: 4, isPromo: false },
     { name: "Barba Sencilla", label: "Barba Sencilla", earning: 1, manuelEarning: 1, isPromo: false },
     { name: "Barba Premium", label: "Barba Premium", earning: 2, manuelEarning: 2, isPromo: false },
-    { name: "Afeitado", label: "Afeitado", earning: 1, manuelEarning: 1, isPromo: false },
-    { name: "Facial Primera Vez", label: "Facial Primera Vez", earning: 4, manuelEarning: 3, isPromo: false },
-    { name: "Facial", label: "Facial", earning: 5, manuelEarning: 3, isPromo: false },
     { name: "Corte+Barba Premium", label: "Corte+Barba Premium", earning: 8, manuelEarning: 6, isPromo: false },
     { name: "Corte+Barba Sencilla", label: "Corte+Barba Sencilla", earning: 7, manuelEarning: 5, isPromo: false },
+    { name: "Facial", label: "Facial", earning: 5, manuelEarning: 3, isPromo: false },
+    { name: "Facial Primera Vez", label: "Facial Primera Vez", earning: 4, manuelEarning: 3, isPromo: false },
     { name: "Mascarilla Completa", label: "Mascarilla Completa", earning: 0.5, manuelEarning: 0.5, isPromo: false },
     { name: "Promo Pana", label: "Promo Pana", earning: 4, manuelEarning: 8, isPromo: true },
+
   ];
 
   useEffect(() => {
